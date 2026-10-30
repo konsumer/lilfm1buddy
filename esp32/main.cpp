@@ -177,7 +177,10 @@ static int listen(int d, const std::vector<Firmware>& list) {
         memcpy(out + 7, name.data(), name.size());
         out[7 + name.size()] = 0xF7;
         midi::sendWait(d, out, 8 + name.size(), 1000);
+        delay(30);  // (it takes one SysEx at a time: one that comes before it took the last is lost)
       }
+      say(TFT_WHITE, "Sent it the list (%u).", (unsigned)list.size());
+      midi::drain(d);  // (the hellos that came meanwhile)
     } else if (n == 7 && !memcmp(m, HELLO, 4) && m[4] == 0x12 && m[5] < list.size()) {
       return m[5];
     }

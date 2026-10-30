@@ -185,6 +185,8 @@ td {
 td:last-child {
   width: 1%;
   text-align: right;
+  overflow-wrap: normal;
+  white-space: nowrap;
 }
 
 .tabs {
@@ -238,4 +240,24 @@ details {
 summary {
   cursor: pointer;
   color: var(--dim);
+}
+
+.icon {
+  display: inline-flex;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.icon:hover {
+  background: var(--code);
+  color: var(--bad);
+}
+
+.icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

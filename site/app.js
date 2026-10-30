@@ -6,6 +6,7 @@ const LOADER_SHA256 = 'd41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68
 const PIECE = 4096 // what the board takes before an ACK
 
 const $ = (s) => document.querySelector(s)
+const TRASH = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>'
 
 // ---- tabs ----
 function tab(name) {
@@ -179,7 +180,7 @@ async function refresh() {
   body.innerHTML = ''
   for (const f of files) {
     const tr = document.createElement('tr')
-    tr.innerHTML = `<td></td><td class="num">${kb(f.size)}</td><td><button class="button small secondary">Remove</button></td>`
+    tr.innerHTML = `<td></td><td class="num">${kb(f.size)}</td><td><button class="icon" title="Remove" aria-label="Remove ${f.name}">${TRASH}</button></td>`
     tr.firstChild.textContent = f.name.replace(/\.fwsc$/i, '')
     tr.querySelector('button').addEventListener('click', () => run(`Removing ${f.name}…`, () => board.rm(f.name)))
     body.append(tr)

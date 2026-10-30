@@ -18,6 +18,7 @@
 #include "hal.h"
 #include "midi.h"
 #include "rom.h"
+#include "tusb.h"
 
 #define PICKER "/sdcard/lilfm1buddy/picker.bin"
 #define LINE_H 16
@@ -72,15 +73,48 @@ static int findFm1(uint32_t ms) {
   return -1;
 }
 
-// the USB devices that come and go, for a while
+// the USB port as the S3's controller sees it (HPRT): connected (something pulls D+ or D- up), enabled (reset done),
+// the lines (D+, D-) and the speed
+#define HPRT (0x60080000u + 0x440)
+static uint32_t port() {
+  uint32_t h = REG_READ(HPRT);
+  return (h & 1) | (h & 4) >> 1 | (h >> 10 & 3) << 2 | (h >> 17 & 3) << 4;
+}
+
+static void sayPort(uint32_t p) {
+  static const char* SPEED[] = {"high", "full", "low", "?"};
+  say(TFT_CYAN, "port: %s%s, D+ %d D- %d, %s speed", p & 1 ? "connected" : "empty", p & 2 ? ", enabled" : "",
+      (int)(p >> 2 & 1), (int)(p >> 3 & 1), SPEED[p >> 4 & 3]);
+}
+
+// the USB port and the devices on it, as they change, for a while
 static void watch(uint32_t ms) {
-  uint32_t seen[MIDI_USB] = {};
-  for (uint32_t start = millis(); millis() - start < ms; delay(100)) {
+  uint32_t seen[MIDI_USB] = {}, last = 0xFFFF;
+  bool mounted[CFG_TUH_DEVICE_MAX + 1] = {};
+  for (uint32_t start = millis(); millis() - start < ms; delay(20)) {
+    uint32_t p = port();
+    if (p != last) {
+      sayPort(p);
+      last = p;
+    }
+    for (uint8_t a = 1; a <= CFG_TUH_DEVICE_MAX; a++) {
+      bool m = tuh_mounted(a);
+      if (m != mounted[a]) {
+        uint16_t vid = 0, pid = 0;
+        if (m) {
+          tuh_vid_pid_get(a, &vid, &pid);
+          say(TFT_GREEN, "device %u: %04X:%04X", a, vid, pid);
+        } else {
+          say(TFT_YELLOW, "device %u went", a);
+        }
+        mounted[a] = m;
+      }
+    }
     for (int d = 0; d < MIDI_USB; d++) {
       midi::Dev v;
       if (midi::dev(d, v) && v.on && v.serial != seen[d]) {
         seen[d] = v.serial;
-        say(TFT_GREEN, "USB: %04X:%04X %s", v.vid, v.pid, v.name);
+        say(TFT_GREEN, "MIDI: %04X:%04X %s", v.vid, v.pid, v.name);
       }
     }
     if (hal::storageSeen(ROM_VID, ROM_PID)) {
@@ -88,6 +122,7 @@ static void watch(uint32_t ms) {
       return;
     }
   }
+  sayPort(port());
 }
 
 static void test(void*) {
@@ -141,6 +176,7 @@ static void test(void*) {
     fail(e);
     return vTaskDelete(0);
   }
+  sayPort(port());
   say(TFT_WHITE, "Boot ROM: picker to %08X", (unsigned)PICKER_AT);
   if ((e = rom::run(PICKER_AT, picker.data(), picker.size()))) {
     fail(e);

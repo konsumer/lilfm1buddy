@@ -1,3 +1,6 @@
 [submodule "third_party/felucca-bsp"]
 	path = third_party/felucca-bsp
 	url = https://github.com/hugelton/felucca-bsp
+[submodule "third_party/fm1buddy"]
+	path = third_party/fm1buddy
+	url = https://github.com/konsumer/fm1buddy

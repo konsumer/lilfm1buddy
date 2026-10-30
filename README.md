@@ -3,7 +3,7 @@
 A tiny ESP32-S3 that plugs straight into the FM-1's USB port and lets you switch its firmware from the FM-1 itself:
 no screen, no buttons, no MIDI. Plug it in, pick a firmware on the FM-1's screen with its keys, and it's installed.
 
-Not working yet: this is the plan, and the first experiment.
+Early: the picker and the install are written, not yet tried on hardware together.
 
 ## How it works
 
@@ -18,8 +18,9 @@ lilfm1buddy runs its own program there instead, the **picker**:
 2. It writes the picker to the FM-1's RAM and jumps to it. Nothing is written to flash.
 3. The picker starts the FM-1's screen, keys and USB, and shows the firmwares the ESP32 has (it asks over USB).
 4. You pick one with the keys. The picker tells the ESP32.
-5. The ESP32 sends that firmware over the M-UPGRADE update protocol (as fm1buddy installs), and the picker writes it
-   and restarts the FM-1.
+5. The ESP32 sends the FM-1 back into its boot ROM (the picker takes the same SysEx), runs JieLi's loader there, and
+   writes that firmware's flash image (from `0x4000` to its end), as fm1buddy's recovery does. (felucca's loader can write it itself, but its
+   flash driver wants the flash as the firmware's startup leaves it: started by the boot ROM, it isn't.)
 
 So: one install per switch, and no change to any firmware. Later, the ESP32 can also keep each firmware's projects
 and settings: read the flash before switching away, and put them back when switching back.
@@ -32,14 +33,13 @@ and settings: read the flash before switching away, and put them back when switc
   (`ldr_screen.c`), is a USB-MIDI device and answers M-UPGRADE as `ota-FM-1_900`. The picker is this plus a menu.
 - `boards/fm1/`: the LCD, key scan, knobs and LEDs.
 
-The ESP32 side is fm1buddy's code: the boot ROM protocol and key (`uboot.cpp`, `key_s3.cpp`), the USB host, and the
-M-UPGRADE installer (`fm1.cpp`).
+The ESP32 side is fm1buddy's board code (the USB host, the key at power-on: `key_s3.cpp`, packages: `fm1.cpp`), and
+its boot ROM protocol (`uboot.cpp`), in `esp32/rom.cpp` with its files from the board's flash.
 
 ## Plan
 
-1. **Does a RAM image run from the boot ROM?** Build felucca-bsp's loader unchanged (`picker/build.sh`), have
-   fm1buddy write it to RAM and jump to it (a console command, like `wl82loader.bin` but at `0x01C0A800`), then look
-   for "UPDATING" on the screen and an `ota-FM-1_900` USB device. If it does, the rest is ordinary work.
+1. **Does a RAM image run from the boot ROM?** Yes (2026-10-30): felucca-bsp's loader, written to RAM and started
+   by the boot ROM, drew its screen and came up on USB as `1209:0002`.
 2. **The picker:** a menu on the screen, the keys, and a small SysEx exchange with the ESP32 (the list of firmwares,
    the choice). Then the install it already does.
 3. **lilfm1buddy:** a PlatformIO build for a small ESP32-S3 (a Super Mini, battery) with fm1buddy's boot ROM, USB
@@ -66,6 +66,32 @@ The picker needs JieLi's Linux toolchain (Felucca's `tools/get_toolchain.sh` fet
 git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/picker.bin
 ```
+
+## Use it
+
+On an fm1buddy board (the CYD-S3) for now. It builds on fm1buddy's code (`third_party/fm1buddy`) with its own main
+(`esp32/`). Everything it needs is in its own flash, no SD card:
+
+```sh
+JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/picker.bin
+tools/data.sh                                        # data/: picker.bin, and JieLi's wl82loader.bin (checked)
+cp ~/somewhere/*.fwsc data/fm1/                      # the firmwares (about 13 MB fit)
+pio run -e cyd -t uploadfs                           # data/ into the board's flash
+pio run -e cyd -t upload                             # the program
+```
+
+Then plug the board into the FM-1, both on battery, and reset the board:
+
+- with a running stock V15 or Felucca-based firmware, it sends the FM-1 into its boot ROM by SysEx;
+- otherwise (SLOOP, or no FM-1 found) it restarts into key mode: switch the FM-1 off, then on.
+
+On the FM-1: turn any knob to move, press any button to pick (and again to be sure), or press a piano key to jump to
+that row. The first row keeps what's on it (the FM-1 restarts, nothing written). The board then writes the one you
+picked through the boot ROM and JieLi's loader: the sectors of its flash image that differ, from `0x4000` (the head,
+what the chip starts from, is never written) to the image's end (`0x93000` for most; baudgirl `0xBA000`, stock V16
+`0xA9000`). The flash past the image stays. Until a firmware is picked, nothing is written to the FM-1's flash.
+
+On a computer, the board is a serial console: `third_party/fm1buddy/tools/s3.py log` prints what happened.
 
 ## Credits
 

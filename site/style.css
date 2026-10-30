@@ -261,3 +261,18 @@ summary {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+select {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+}
+
+h2 a {
+  color: inherit;
+}

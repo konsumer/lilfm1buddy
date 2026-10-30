@@ -71,9 +71,17 @@
               </thead>
               <tbody></tbody>
             </table>
+            <h2>Add one from the <a href="https://thefirmwarehub.com">FM-1 Firmware Hub</a></h2>
+            <p class="row">
+              <select id="hub" disabled>
+                <option>Getting the Hub's list…</option>
+              </select>
+              <button id="addhub" class="button" disabled>Add</button>
+            </p>
+            <p id="hubwhat" class="dim"></p>
+            <h2>Or from your computer</h2>
             <p class="row">
               <label class="button">Add .fwsc files<input id="add" type="file" accept=".fwsc" multiple hidden /></label>
-              <span class="dim">(from your computer: the <a href="https://thefirmwarehub.com">FM-1 Firmware Hub</a> has them)</span>
             </p>
             <p id="busy" class="dim"></p>
             <details>

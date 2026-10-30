@@ -4,6 +4,7 @@
 const LOADER_URL = 'https://raw.githubusercontent.com/kagaimiq/jl-uboot-tool/c32b28e7a04f873f526ba929cb1bae9f05442fe9/data/loaderblobs/usb/wl82loader.bin'
 const LOADER_SHA256 = 'd41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68dca5376'
 const PIECE = 4096 // what the board takes before an ACK
+const HUB = 'https://thefirmwarehub.com/' // the FM-1 Firmware Hub: catalog.json, and the packages next to it
 
 const $ = (s) => document.querySelector(s)
 const TRASH = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>'
@@ -162,6 +163,7 @@ const kb = (n) => `${Math.round(n / 1024).toLocaleString()} KB`
 function busy(text) {
   $('#busy').textContent = text || ''
   for (const b of document.querySelectorAll('#manage button, #add')) b.disabled = !!text
+  if (!text) $('#addhub').disabled = !hub[$('#hub').value]
 }
 
 async function sha256(bytes) {
@@ -266,3 +268,50 @@ $('#getlog').addEventListener('click', () =>
     $('#log').textContent = (await board.log()) || '(nothing yet)'
   })
 )
+
+// ---- the Hub's firmwares ----
+let hub = []
+
+const label = (f) => `${f.name}${f.version ? ' ' + f.version : ''}${f.author ? ' (' + f.author + ')' : ''}${f.beta ? ' beta' : ''}`
+
+fetch(HUB + 'catalog.json')
+  .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
+  .then((c) => {
+    const ok = (f) => f.pkg && f.size && /^[0-9a-f]{64}$/.test(f.sha256 || '') && !f.pkg.includes('..')
+    hub = (c.firmwares || []).filter(ok).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    if (c.stock && ok(c.stock)) hub.unshift({ ...c.stock, name: `M-VAVE stock ${c.stock.product.replace('FM-1_0', 'V')}`, what: "The FM-1's own firmware." })
+    const sel = $('#hub')
+    sel.innerHTML = '<option value="">Pick a firmware…</option>'
+    hub.forEach((f, i) => {
+      const o = document.createElement('option')
+      o.value = i
+      o.textContent = `${label(f)}, ${kb(f.size)}`
+      sel.append(o)
+    })
+    sel.disabled = false
+  })
+  .catch(() => {
+    $('#hub').innerHTML = "<option>The Hub's list didn't come</option>"
+  })
+
+$('#hub').addEventListener('change', () => {
+  const f = hub[$('#hub').value]
+  $('#hubwhat').textContent = f ? f.what || '' : ''
+  $('#addhub').disabled = !f
+})
+
+$('#addhub').addEventListener('click', () => {
+  const f = hub[$('#hub').value]
+  if (!f) return
+  const name = f.pkg
+    .split('/')
+    .pop()
+    .replace(/[^A-Za-z0-9._+-]/g, '_')
+  run(`Getting ${label(f)}…`, async () => {
+    const r = await fetch(HUB + f.pkg)
+    if (!r.ok) throw new Error(`The Hub didn't give it (${r.status}).`)
+    const bytes = new Uint8Array(await r.arrayBuffer())
+    if (bytes.length !== f.size || (await sha256(bytes)) !== f.sha256) throw new Error("It didn't come as the Hub's list says: try again.")
+    await board.put(name, bytes, (done, total) => busy(`${name}: ${Math.round((done * 100) / total)}%`))
+  })
+})

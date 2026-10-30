@@ -1,0 +1,7 @@
+{
+  "name": "lilfm1buddy",
+  "private": true,
+  "scripts": {
+    "fmt": "npx -y prettier -w site"
+  }
+}

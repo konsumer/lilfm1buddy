@@ -19,7 +19,7 @@ lilfm1buddy runs its own program there instead, the **picker**:
 3. The picker starts the FM-1's screen, keys and USB, and shows the firmwares the ESP32 has (it asks over USB).
 4. You pick one with the keys. The picker tells the ESP32.
 5. The ESP32 sends the FM-1 back into its boot ROM (the picker takes the same SysEx), runs JieLi's loader there, and
-   writes the app area of that firmware, as fm1buddy's recovery does. (felucca's loader can write it itself, but its
+   writes that firmware's flash image (from `0x4000` to its end), as fm1buddy's recovery does. (felucca's loader can write it itself, but its
    flash driver wants the flash as the firmware's startup leaves it: started by the boot ROM, it isn't.)
 
 So: one install per switch, and no change to any firmware. Later, the ESP32 can also keep each firmware's projects
@@ -87,8 +87,9 @@ Then plug the board into the FM-1, both on battery, and reset the board:
 
 On the FM-1: turn any knob to move, press any button to pick (and again to be sure), or press a piano key to jump to
 that row. The first row keeps what's on it (the FM-1 restarts, nothing written). The board then writes the one you
-picked through the boot ROM and JieLi's loader: the sectors of the app area (`[0x4000, 0x93000)`) that differ. Each
-firmware's data, above that, stays. Until a firmware is picked, nothing is written to the FM-1's flash.
+picked through the boot ROM and JieLi's loader: the sectors of its flash image that differ, from `0x4000` (the head,
+what the chip starts from, is never written) to the image's end (`0x93000` for most; baudgirl `0xBA000`, stock V16
+`0xA9000`). The flash past the image stays. Until a firmware is picked, nothing is written to the FM-1's flash.
 
 On a computer, the board is a serial console: `third_party/fm1buddy/tools/s3.py log` prints what happened.
 

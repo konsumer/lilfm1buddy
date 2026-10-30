@@ -8,8 +8,8 @@
 //      flash yet: switching the FM-1 off and on brings its firmware back
 //   3. the picker asks for the list (picker.c says how), shows it, and says which one
 //   4. that one is written to it: the FM-1 back into its boot ROM (the picker takes the SysEx too), JieLi's loader
-//      (wl82loader.bin), and the sectors of its app area that differ, as fm1buddy's recovery writes them. The rest of
-//      the flash (each firmware's data) stays
+//      (wl82loader.bin), and the sectors of its flash image (from 0x4000 to its end) that differ, as fm1buddy's
+//      recovery writes them. Its head (what the chip starts from) and the flash past the image stay
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <TFT_eSPI.h>
@@ -36,7 +36,6 @@
 #define LIST_MAX 24  // picker.c's PK_MAX
 #define NAME_MAX 20  // and PK_NAME
 #define LINE_H 16
-#define APP_END 0x93000u  // the app area is [WRITE_FROM, APP_END): an update loader writes no more
 
 struct Firmware {
   std::string file, name;  // "fomajam-0.1.7.fwsc", "fomajam-0.1.7"
@@ -239,7 +238,7 @@ static const char* install(int d, const Firmware& f, const std::vector<uint8_t>&
     return "Its flash image is a size the FM-1's isn't.";
   }
   const uint8_t* want = pkg.image + at;
-  uint32_t end = n < APP_END ? n : APP_END;
+  uint32_t end = n;  // (as far as its image goes: 0x93000 for most, more for some: baudgirl 0xBA000, stock V16 0xA9000)
   rom::Chip chip;
   say(TFT_WHITE, "To its boot ROM, and JieLi's loader");
   if ((e = rom::enter(d)) || (e = rom::attach(10000)) || (e = rom::loader(loader.data(), loader.size(), chip))) {

@@ -30,12 +30,16 @@
           <p>An ESP32-S3 board (pick yours, the install button follows):</p>
           <div class="boards">
             <label class="board"
-              ><input type="radio" name="board" value="xiao" checked /> <strong>Seeed XIAO ESP32S3</strong> <span class="tag">suggested</span><br />
-              <span class="dim">21 × 18 mm. 8 MB flash: about 10 firmwares. A LiPo charger on board, with battery pads on its back. Its one LED blinks what it's doing.</span></label
+              ><input type="radio" name="board" value="xiaoplus" checked /> <strong>Seeed XIAO ESP32S3 Plus</strong> <span class="tag">suggested</span><br />
+              <span class="dim">21 × 18 mm. 16 MB flash: about 20 firmwares. A LiPo charger on board (battery pads on its back), and it reads its battery: the FM-1 shows its level. Its one LED blinks what it's doing.</span></label
+            >
+            <label class="board"
+              ><input type="radio" name="board" value="xiao" /> <strong>Seeed XIAO ESP32S3</strong><br />
+              <span class="dim">The same size, 8 MB flash: about 10 firmwares. A LiPo charger on board, but it can't read its battery.</span></label
             >
             <label class="board"
               ><input type="radio" name="board" value="zero" /> <strong>Waveshare ESP32-S3-Zero</strong><br />
-              <span class="dim">24 × 18 mm. 4 MB flash: 3 or 4 firmwares. No charger: a LiPo and a charger board on its 5V pin (it takes 3.7 to 6 V there). Its RGB LED in colours.</span></label
+              <span class="dim">24 × 18 mm. 4 MB flash: 3 or 4 firmwares. No charger: a LiPo and a charger board on its 5V pin (it takes 3.7 to 6 V there). Its RGB LED in colours (it draws a little even while the board sleeps: a power switch helps here).</span></label
             >
             <label class="board"
               ><input type="radio" name="board" value="devkit" /> <strong>Any ESP32-S3 with 16 MB flash and PSRAM</strong> (N16R8, like the ESP32-S3-DevKitC-1)<br />
@@ -43,12 +47,13 @@
             >
           </div>
           <ul>
-            <li><strong>a battery</strong>: the board is the FM-1's USB host, each on its own battery, one USB-C data cable between them (no hub, no charger in between). It's only on for a minute or two at a time, so a small one does: a single-cell (1S, 3.7 V) LiPo <em>with a protection circuit</em>, 300 to 500 mAh (the XIAO charges it at about 100 mA, a few hours from its USB-C). On the XIAO, solder its leads to the BAT+ and BAT− pads on the back. <strong>Check the polarity with a meter first</strong>: the red and black wires on these packs aren't always where their plug says.</li>
+            <li><strong>a battery</strong>: the board is the FM-1's USB host, each on its own battery, one USB-C data cable between them (no hub, no charger in between). A single-cell (1S, 3.7 V) LiPo, 150 to 500 mAh: a few mAh a firmware switch, and the XIAO charges it at about 100 mA from its USB-C (its red charge LED flashes while it does, and goes out when it's full). Small ones made for toy helicopters (like the Syma S107's) do, but often have no protection circuit: take one that says it has, or let the board's sleep (below) look after it. On the XIAO, cut off the plug and solder the leads to the BAT+ and BAT− pads on its back. <strong>Check the polarity with a meter first</strong>: the wires on these packs aren't always where their plug says.</li>
+            <li>no power switch: when it's done (or nothing happens for a while) the board goes to deep sleep, a few tens of µA (months on a small battery). <strong>Press its reset button to wake it</strong> for the next switch.</li>
             <li>Chrome or Edge on a computer, and a USB-C cable that carries data</li>
           </ul>
           <h2>1. The program</h2>
           <p>Plug the board into this computer and press Install. A new board: let it erase. To update one, don't: its firmwares stay.</p>
-          <esp-web-install-button id="install" manifest="fw/xiao/manifest.json">
+          <esp-web-install-button id="install" manifest="fw/xiaoplus/manifest.json">
             <button slot="activate" class="button">Install lilfm1buddy</button>
             <span slot="unsupported">Your browser can't: use Chrome or Edge on a computer.</span>
             <span slot="not-allowed">This page has to be opened over https.</span>
@@ -113,8 +118,8 @@
           <ol>
             <li>Both on battery: plug the board into the FM-1 with a USB-C data cable (no hub, no charger), and switch them on.</li>
             <li>With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With any other (SLOOP, ...), or none, the LED says <em>switch it off, then on</em>: do.</li>
-            <li>The FM-1 shows the list. Turn any knob to move, press any button to pick, and again to be sure. A piano key jumps to its row. The top row keeps what's on it.</li>
-            <li>The board writes it, then the FM-1 starts it. Unplug the board.</li>
+            <li>The FM-1 shows the list. Turn any knob to move, press any button to pick, and again to be sure. A piano key jumps to its row. The top of the screen shows both batteries (the FM-1's, and the board's when it can tell).</li>
+            <li>The board writes it, then the FM-1 starts it, and the board goes to sleep. Unplug it.</li>
           </ol>
           <h2>The LED</h2>
           <table>
@@ -158,7 +163,7 @@
               </tr>
             </tbody>
           </table>
-          <p>Until a firmware is picked nothing is written: switching the FM-1 off and on brings its firmware back. Only the firmware's own image is written, never the flash's head (what the chip starts from), and the chip's boot loader is in its ROM: nothing here can make it unrecoverable.</p>
+          <p>Until a firmware is picked nothing is written: to keep what's on it, switch the FM-1 off and on. Only the firmware's own image is written, never the flash's head (what the chip starts from), and the chip's boot loader is in its ROM: nothing here can make it unrecoverable.</p>
           <p>How it works, and the code: <a href="https://github.com/konsumer/lilfm1buddy">github.com/konsumer/lilfm1buddy</a>. Its bigger sibling, with a touch screen, Wi-Fi and MIDI routing: <a href="https://konsumer.github.io/fm1buddy/">fm1buddy</a>.</p>
         </section>
       </div>

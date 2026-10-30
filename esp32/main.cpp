@@ -13,7 +13,8 @@
 // The files are in the board's own flash (LittleFS): wl82loader.bin, the firmwares (fm1/*.fwsc) and log.txt. On a
 // computer the board is a serial port for the web page (site/), a command a line:
 //
-//   info                 INFO lilfm1buddy VERSION loader=0|1 files=N free=BYTES total=BYTES
+//   info                 INFO lilfm1buddy VERSION loader=0|1 files=N free=BYTES total=BYTES battery=MV (0: it
+//                        can't tell)
 //   ls                   FILE NAME BYTES (a line each firmware), then END
 //   rm NAME              OK, or ERR why
 //   put NAME BYTES       READY; then the bytes, PIECE at a time, each answered ACK BYTES-SO-FAR; then OK SHA256, or
@@ -23,6 +24,8 @@
 // With SCREEN (the cyd build), what happens is on the board's screen too.
 #include <Arduino.h>
 #include <LittleFS.h>
+#include <driver/gpio.h>
+#include <esp_sleep.h>
 #ifdef SCREEN
 #include <TFT_eSPI.h>
 #endif
@@ -151,7 +154,43 @@ static void say(uint16_t color, const char* fmt, ...) {
 static void fail(const char* e) {
   led(FAILED);
   say(TFT_RED, "%s", e);
-  say(TFT_WHITE, "Done. Reset this board to try again.");
+}
+
+// done (or not): its LED for a while, then deep sleep until its reset button (no power switch needed: tens of uA)
+static void sleepNow() {
+  delay(10000);
+  say(TFT_WHITE, "Sleeping: press its reset button to wake it.");
+  status = -1;
+#ifdef LED_PIN
+  delay(100);  // (the blinks stop)
+  digitalWrite(LED_PIN, !LED_ON);
+  gpio_hold_en((gpio_num_t)LED_PIN);
+  gpio_deep_sleep_hold_en();
+#endif
+#ifdef LED_RGB
+  rgbLedWrite(LED_RGB, 0, 0, 0);
+#endif
+  delay(100);
+  esp_deep_sleep_start();
+}
+
+// its own battery, in bars (0..3), or -1 if it can't tell (BAT_ADC: the pin that reads it, through BAT_DIV)
+static int batteryBars(uint32_t* mv = 0) {
+#ifdef BAT_ADC
+  uint32_t v = 0;
+  for (int i = 0; i < 8; i++) {
+    v += analogReadMilliVolts(BAT_ADC);
+  }
+  v = v / 8 * BAT_DIV;
+  if (mv) {
+    *mv = v;
+  }
+  return v >= 3900 ? 3 : v >= 3700 ? 2
+                     : v >= 3500   ? 1
+                                   : 0;
+#else
+  return -1;
+#endif
 }
 
 // a file from the board's flash, max bytes at most
@@ -230,7 +269,11 @@ static const char* toRom() {
     led(SWITCH);
     say(TFT_CYAN, "Switch the FM-1 OFF, then ON");
     hal::keyStart();
-    for (int last = -1; hal::keyState() != hal::KEY_HOST; delay(50)) {
+    int last = -1;
+    for (uint32_t start = millis(); hal::keyState() != hal::KEY_HOST; delay(50)) {
+      if (millis() - start > 120000) {
+        return "The FM-1 wasn't switched on.";
+      }
       int k = hal::keyState();
       if (k != last) {
         static const char* NAMES[] = {"", "waiting for it to be off", "sending the key: switch it ON",
@@ -262,10 +305,14 @@ static const char* toRom() {
   return e;
 }
 
-// the picker's side: the list when it asks, until it says which one; that one, or -1 (it went)
+// the picker's side: the list when it asks, until it says which one; that one, -1 (it went) or -2 (nothing was
+// picked in 10 minutes)
 static int listen(int d, const std::vector<Firmware>& list) {
   static const uint8_t HELLO[] = {0xF0, 0x7D, 0x4C, 0x42, 0x10, 0xF7};
-  for (;;) {
+  for (uint32_t start = millis();;) {
+    if (millis() - start > 600000) {
+      return -2;
+    }
     midi::Dev v;
     if (!midi::dev(d, v) || !v.on) {
       return -1;
@@ -286,6 +333,13 @@ static int listen(int d, const std::vector<Firmware>& list) {
         delay(30);  // (it takes one SysEx at a time: one that comes before it took the last is lost)
       }
       say(TFT_WHITE, "Sent it the list (%u).", (unsigned)list.size());
+      uint32_t mv = 0;
+      int bars = batteryBars(&mv);
+      if (bars >= 0) {  // (its battery, for the picker's header)
+        uint8_t out[] = {0xF0, 0x7D, 0x4C, 0x42, 0x02, (uint8_t)bars, 0xF7};
+        midi::sendWait(d, out, sizeof out, 1000);
+        say(TFT_WHITE, "Its battery: %u mV", (unsigned)mv);
+      }
       midi::drain(d);  // (the hellos that came meanwhile)
     } else if (n == 7 && !memcmp(m, HELLO, 4) && m[4] == 0x12 && m[5] < list.size()) {
       return m[5];
@@ -364,27 +418,25 @@ static void run(void*) {
     e = "No firmwares (fm1/*.fwsc).";
   }
   if (e || (e = toRom())) {
-    if (e) {
-      fail(e);
-    }
-    return vTaskDelete(0);
+    fail(e);
+    sleepNow();
   }
   say(TFT_WHITE, "%u firmwares. The picker to the FM-1...", (unsigned)list.size());
   if ((e = rom::run(PICKER_AT, pickerStart, pickerEnd - pickerStart))) {
     fail(e);
-    return vTaskDelete(0);
+    sleepNow();
   }
   int d = findPicker(10000);
   if (d < 0) {
     fail("The picker didn't show up on USB.");
-    return vTaskDelete(0);
+    sleepNow();
   }
   led(PICK);
   say(TFT_GREEN, "Pick one on the FM-1.");
   int i = listen(d, list);
   if (i < 0) {
-    fail("The picker went (the FM-1 restarted?).");
-    return vTaskDelete(0);
+    fail(i == -1 ? "The picker went (the FM-1 restarted?)." : "Nothing was picked: switch the FM-1 off and on.");
+    sleepNow();
   }
   say(TFT_GREEN, "Installing %s", list[i].file.c_str());
   if ((e = install(d, list[i], loader))) {
@@ -393,7 +445,7 @@ static void run(void*) {
     led(DONE);
     say(TFT_GREEN, "Installed. Unplug this board.");
   }
-  vTaskDelete(0);
+  sleepNow();
 }
 
 // ---- on a computer: the web page's commands (at the top) ----
@@ -422,9 +474,11 @@ static std::string pathOf(const char* n) {
 static void info() {
   char sha[65];
   bool loader = hal::sha256(LOADER, sha) && !strcmp(sha, LOADER_SHA256);
-  Serial.printf("INFO lilfm1buddy " VERSION " loader=%d files=%u free=%u total=%u\n", loader,
+  uint32_t mv = 0;
+  batteryBars(&mv);
+  Serial.printf("INFO lilfm1buddy " VERSION " loader=%d files=%u free=%u total=%u battery=%u\n", loader,
                 (unsigned)firmwares().size(), (unsigned)(LittleFS.totalBytes() - LittleFS.usedBytes()),
-                (unsigned)LittleFS.totalBytes());
+                (unsigned)LittleFS.totalBytes(), (unsigned)mv);
 }
 
 static void ls() {

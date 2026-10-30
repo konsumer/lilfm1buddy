@@ -193,7 +193,7 @@ async function sha256(bytes) {
 
 async function refresh() {
   const info = await board.info()
-  $('#board').textContent = `${info.name} ${info.version}`
+  $('#board').textContent = `${info.name} ${info.version}${info.battery ? `, battery ${(info.battery / 1000).toFixed(2)} V` : ''}`
   $('#loader').innerHTML = info.loader ? '<span class="good">On the board.</span>' : '<span class="bad">Not on the board yet: it can\'t write the FM-1 without it.</span>'
   $('#getloader').hidden = !!info.loader
   $('#space').textContent = `${kb(info.free)} free of ${kb(info.total)}. The FM-1's menu shows the first 24, by name.`

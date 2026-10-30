@@ -15,22 +15,29 @@ One of these ESP32-S3 boards (the web page installs each):
 
 | Board | Size | Firmwares | Power | LED |
 | --- | --- | --- | --- | --- |
-| **Seeed XIAO ESP32S3** (suggested) | 21 × 18 mm | about 10 (8 MB flash) | LiPo charger on board, BAT pads on its back | one colour: blinks |
+| **Seeed XIAO ESP32S3 Plus** (suggested) | 21 × 18 mm | about 20 (16 MB flash) | LiPo charger, BAT pads on its back; reads its battery (the FM-1 shows it) | one colour: blinks |
+| Seeed XIAO ESP32S3 | 21 × 18 mm | about 10 (8 MB flash) | LiPo charger, BAT pads on its back | one colour: blinks |
 | Waveshare ESP32-S3-Zero | 24 × 18 mm | 3 or 4 (4 MB flash) | none: a LiPo and a charger board on its 5V pin (3.7 to 6 V) | RGB on GPIO 21 |
 | any ESP32-S3 N16R8 (DevKitC-1, ...) | bigger | about 20 (16 MB flash) | its other USB port (a power bank) | RGB on GPIO 48 |
 
 And a battery: the board is the FM-1's USB host, each on its own battery, one USB-C data cable between them, no
-hub. It's only on for a minute or two at a time: a single-cell (1S, 3.7 V) LiPo **with a protection circuit**, 300 to
-500 mAh, is plenty (the XIAO charges it at about 100 mA). Check its polarity with a meter before soldering it to the
-XIAO's pads: the wires on these packs aren't always where their plug says.
+hub. A single-cell (1S, 3.7 V) LiPo of 150 to 500 mAh does: a switch takes a few mAh, and the XIAO charges at about
+100 mA (its red charge LED flashes while it does). Small packs for toy helicopters (the Syma S107's) work, but often
+have no protection circuit: take one that has, or count on the board's sleep. Cut the plug off, check the polarity
+with a meter (the wires on these packs aren't always where their plug says) and solder it to the XIAO's BAT pads.
+
+No power switch: when it's done, or nothing happens for a while (two minutes waiting for the FM-1 to be switched
+on, ten for a pick), the board goes to deep sleep: tens of µA, months on a small battery. **Its reset
+button wakes it.** (The Zero's RGB LED still draws a little while it sleeps: a switch helps there.)
 
 ## Use it
 
 1. Plug the board into the FM-1 and switch both on.
 2. With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With
    any other (SLOOP, ...), or none, the LED goes yellow: switch the FM-1 off, then on.
-3. The FM-1 shows the list (LED cyan). Turn any knob to move, press any button to pick (and again to be sure), or a
-   piano key to jump to its row. The top row keeps what's on it.
+3. The FM-1 shows the list (LED cyan), and both batteries at the top (the FM-1's, and the board's on the Plus). Turn
+   any knob to move, press any button to pick (and again to be sure), or a piano key to jump to its row. To keep
+   what's on it, switch the FM-1 off and on.
 4. The board writes it (magenta), and the FM-1 starts it (green). Red: it didn't; the page's Firmwares tab shows the
    board's log. (The XIAO's one LED blinks instead: the page's "Use it" tab has them.)
 
@@ -68,7 +75,7 @@ board's program has the picker in it:
 ```sh
 git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/picker.bin
-pio run -e xiao -t upload                            # the board: xiao, zero or devkit
+pio run -e xiaoplus -t upload                        # the board: xiaoplus, xiao, zero or devkit
 npm run fmt                                          # the web page's formatting
 ```
 

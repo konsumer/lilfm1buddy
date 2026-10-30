@@ -1,5 +1,5 @@
-# Builds the picker (JieLi's toolchain) and the board's program for each board (xiao, zero, devkit; and cyd, to see
-# that it still builds). On main,
+# Builds the picker (JieLi's toolchain) and the board's program for each board (xiaoplus, xiao, zero, devkit; and
+# cyd, to see that it still builds). On main,
 # the web page (site/) goes to GitHub Pages with the program next to it (site/fw/). Settings -> Pages -> Source: GitHub
 # Actions.
 name: build
@@ -38,11 +38,11 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install platformio
-      - run: pio run -e xiao -e zero -e devkit -e cyd
+      - run: pio run -e xiaoplus -e xiao -e zero -e devkit -e cyd
       - name: the page, with the program
         run: |
           version="$(git describe --tags --always)"
-          for b in xiao zero devkit; do
+          for b in xiaoplus xiao zero devkit; do
             mkdir -p site/fw/$b
             cp .pio/build/$b/firmware.factory.bin site/fw/$b/lilfm1buddy.bin
             jq -n --arg v "$version" '{name: "lilfm1buddy", version: $v, new_install_prompt_erase: true,

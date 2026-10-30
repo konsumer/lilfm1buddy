@@ -38,8 +38,9 @@ const char* run(uint32_t addr, const uint8_t* image, uint32_t n);
 // JieLi's loader (wl82loader.bin as it comes: already ciphered) into RAM and started, and what it says of the chip;
 // 0 or an error
 const char* loader(const uint8_t* image, uint32_t n, Chip& chip);
-// with the loader running: the whole flash; one sector, erased, written and read back; back to its firmware
-const char* read(const Chip& chip, std::vector<uint8_t>& out, void (*progress)(uint32_t done, uint32_t total));
+// with the loader running: n bytes of its flash from addr; one sector, erased, written and read back; back to its
+// firmware
+const char* read(const Chip& chip, uint32_t addr, uint8_t* out, uint32_t n);
 const char* writeSector(uint32_t addr, const uint8_t* data);
 void leave();
 }  // namespace rom

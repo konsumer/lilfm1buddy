@@ -10,11 +10,14 @@
  *   ESP32 -> picker  F0 7D 4C 42 01 i n NAME F7  firmware i of n (NAME: ASCII, 7-bit)
  *   picker -> ESP32  F0 7D 4C 42 12 i F7        install firmware i (once a second, until the ESP32 sends the boot
  *                                               ROM's key: F0 22 24 35 7D F7)
+ *   ESP32 -> picker  F0 7D 4C 42 02 L F7        its own battery: L 0..3 bars (it doesn't send it if it can't tell)
+ *
+ * Its header shows both batteries: the FM-1's (its ADC, in Felucca's bars) and the ESP32's.
  *
  * Then the ESP32 writes it through the boot ROM and JieLi's loader, as fm1buddy's recovery does: the flash driver
- * here (fm1_flash.h) wants the flash as the SPL leaves it, and the boot ROM doesn't. "Keep" restarts the FM-1 with
- * nothing written. Any knob moves, any button picks (and again to be sure), a piano key jumps to its row. Runs from
- * RAM with interrupts off: USB is polled. Single compilation unit. */
+ * here (fm1_flash.h) wants the flash as the SPL leaves it, and the boot ROM doesn't. Nothing is written until one is
+ * picked: switching the FM-1 off and on keeps what's on it. Any knob moves, any button picks (and again to be
+ * sure), a piano key jumps to its row. Runs from RAM with interrupts off: USB is polled. Single compilation unit. */
 #include <stdint.h>
 #define FELUCCA_LOADER 1
 #define FELUCCA_CDC 0
@@ -90,10 +93,12 @@ static void ldr_record_clear(void) { fm1_updata_parm_clear(); }
 #define PK_ROW_H 22u
 #define PK_TOP 40u
 
-static char pk_names[PK_MAX + 1u][PK_NAME + 1u]; /* row 0: keep what's there */
+static char pk_names[PK_MAX][PK_NAME + 1u];
 static uint8_t pk_have[PK_MAX];
 static uint32_t pk_n;          /* firmwares, as the ESP32 said (0: no list yet) */
 static uint32_t pk_sel, pk_top; /* the highlighted row, the first on screen */
+static int32_t pk_batt_raw;     /* the FM-1's battery: smoothed ADC (0: not read yet) */
+static int32_t pk_fm1 = -1, pk_lil = -1; /* the batteries, 0..3 bars (-1: not known) */
 
 static void pk_send(uint8_t cmd, int32_t arg)
 {
@@ -131,11 +136,55 @@ static void pk_frame(const uint8_t *p, uint32_t n)
     }
     for (k = 0; k < PK_NAME && 3u + k < n; k++) {
       char c = (char)p[3u + k];
-      pk_names[i + 1u][k] = c >= 'a' && c <= 'z' ? (char)(c - 32) : c;
+      pk_names[i][k] = c >= 'a' && c <= 'z' ? (char)(c - 32) : c;
     }
-    pk_names[i + 1u][k] = 0;
+    pk_names[i][k] = 0;
     pk_have[i] = 1;
+  } else if (n >= 2u && p[0] == 0x02 && p[1] <= 3u)
+    pk_lil = p[1];
+}
+
+/* a battery: an outline and up to 3 bars, at x, y (24 x 9) */
+static void pk_cell(uint32_t x, uint32_t y, int32_t bars)
+{
+  uint16_t c = bars == 0 ? SCR_BAR : SCR_FG;
+  int32_t b;
+  scr_fill(x, y, 21, 9, c);
+  scr_fill(x + 1u, y + 1u, 19, 7, SCR_BG);
+  scr_fill(x + 21u, y + 2u, 2, 5, c);
+  for (b = 0; b < bars; b++)
+    scr_fill(x + 3u + (uint32_t)b * 6u, y + 2u, 4, 5, c);
+}
+
+/* both batteries, under the title */
+static void pk_batts(void)
+{
+  uint32_t w = pk_lil >= 0 ? 116u : 52u, x = (240u - w) / 2u;
+  scr_fill(0, 27, 240, 11, SCR_BG);
+  if (pk_fm1 < 0)
+    return;
+  scr_line(x, 28, "FM-1", 1, SCR_FG, SCR_BG);
+  pk_cell(x + 28u, 27, pk_fm1);
+  if (pk_lil >= 0) {
+    scr_line(x + 64u, 28, "BUDDY", 1, SCR_FG, SCR_BG);
+    pk_cell(x + 98u, 27, pk_lil);
   }
+}
+
+/* the FM-1's battery, every second: Felucca's smoothing and bars (ui_draw.c) */
+static int pk_batt_poll(uint32_t now)
+{
+  static uint32_t last;
+  int32_t b, was = pk_fm1;
+  if (pk_batt_raw && now - last < 1000u)
+    return 0;
+  last = now;
+  b = fm1_adc_read(FM1_ADC_BATT);
+  if (b > 0)
+    pk_batt_raw = pk_batt_raw ? pk_batt_raw + (b - pk_batt_raw) / 32 : b;
+  if (pk_batt_raw)
+    pk_fm1 = pk_batt_raw >= 591 ? 3 : pk_batt_raw >= 561 ? 2 : pk_batt_raw >= 531 ? 1 : 0;
+  return pk_fm1 != was;
 }
 
 static void pk_row(uint32_t r)
@@ -147,7 +196,7 @@ static void pk_row(uint32_t r)
 
 static void pk_list(void)
 {
-  uint32_t r, rows = pk_n + 1u;
+  uint32_t r, rows = pk_n;
   if (pk_sel < pk_top)
     pk_top = pk_sel;
   if (pk_sel >= pk_top + PK_ROWS)
@@ -161,6 +210,7 @@ static void pk_screen(const char *title, const char *a, const char *b)
 {
   scr_fill(0, 0, 240, 240, SCR_BG);
   scr_center(10, title, 2, SCR_FG);
+  pk_batts();
   if (a)
     scr_center(96, a, 2, SCR_FG);
   if (b)
@@ -192,26 +242,18 @@ static void pk_input(int32_t *steps, uint32_t *button, int32_t *key)
     }
 }
 
-static void pk_keep(void) /* the FM-1 starts what's in its flash */
-{
-  pk_screen("RESTARTING", 0, 0);
-  usb_detach();
-  fm1_delay_ms(30);
-  fm1_core_reset();
-}
-
 enum { PK_WAIT, PK_MENU, PK_SURE, PK_ASKED };
 
 static void pk_main(void)
 {
-  uint32_t state = PK_WAIT, said = 0, button, i;
+  uint32_t state = PK_WAIT, said = 0, button;
+  int32_t shown_lil = -1;
   int32_t steps, key;
   fm1_wdt_arm(0x0D); /* ~8 s, fed by ldr_poll */
   fm1_time_init();
   scr_init();
   fm1_input_init();
-  for (i = 0; "KEEP WHAT'S ON IT"[i]; i++)
-    pk_names[0][i] = "KEEP WHAT'S ON IT"[i];
+  fm1_adc_init();
   pk_screen("LILFM1BUDDY", "WAITING FOR", "THE LIST OF FIRMWARES");
   usb_start();
   for (;;) {
@@ -237,11 +279,15 @@ static void pk_main(void)
     if ((state == PK_WAIT || state == PK_ASKED) && now - said >= 1000u) {
       said = now;
       if (usb.config)
-        pk_send(state == PK_WAIT ? 0x10 : 0x12, state == PK_WAIT ? -1 : (int32_t)(pk_sel - 1u));
+        pk_send(state == PK_WAIT ? 0x10 : 0x12, state == PK_WAIT ? -1 : (int32_t)pk_sel);
+    }
+    if (pk_batt_poll(now) | (pk_lil != shown_lil)) {
+      shown_lil = pk_lil;
+      pk_batts();
     }
     pk_input(&steps, &button, &key);
     if (state == PK_MENU) {
-      uint32_t was = pk_sel, rows = pk_n + 1u;
+      uint32_t was = pk_sel, rows = pk_n;
       if (key >= 0 && (uint32_t)key < rows)
         pk_sel = (uint32_t)key;
       else if (steps > 0)
@@ -256,10 +302,10 @@ static void pk_main(void)
           pk_list();
       }
       if (button) {
-        if (pk_sel == 0)
-          pk_keep();
         state = PK_SURE;
         pk_screen("INSTALL", pk_names[pk_sel], "BUTTON: YES   KNOB: NO");
+        if (pk_fm1 == 0)
+          scr_center(160, "LOW BATTERY: CHARGE THE FM-1 FIRST", 1, SCR_BAR);
       }
     } else if (state == PK_SURE) {
       if (button) {

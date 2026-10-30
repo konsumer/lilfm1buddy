@@ -11,19 +11,28 @@ Working on hardware (2026-10-30): fomajam and baudgirl installed from the FM-1's
 
 ## You need
 
-- an ESP32-S3 board with **16 MB flash and PSRAM** (N16R8, like the ESP32-S3-DevKitC-1 N16R8), its USB-C port on the
-  chip's own USB. Its RGB LED (GPIO 48) says what it's doing
-- a battery for it: it's the FM-1's USB host. Each on its own battery, one USB-C data cable between them, no hub
+- a [Seeed XIAO ESP32S3 Plus](https://www.aliexpress.us/item/3256808143430495.html): 21 × 18 mm, room for about 20
+  firmwares, a battery charger on board, and it reads its battery (the FM-1 shows its level)
+- a [3.7 V 180 mAh LiPo with bare wires](https://www.aliexpress.us/item/3256802077349750.html), soldered to the BAT+
+  and BAT− pads on the XIAO's back. Check the polarity with a meter first: the wire colours on these aren't always
+  right. A firmware switch takes a few mAh; the XIAO charges it from its USB-C (its red LED flashes while it does)
+
+No power switch: when it's done, or nothing happens for a while (two minutes waiting for the FM-1 to be switched on,
+ten for a pick), the board goes to deep sleep, months on that battery. **Its reset button wakes it.**
+
+The board is the FM-1's USB host: each on its own battery, one USB-C data cable between them, no hub.
 
 ## Use it
 
-1. Plug the board into the FM-1 and switch both on.
+1. Wake the board (its reset button) and plug it into the FM-1, both switched on. Its LED blips once a second while
+   it looks for the FM-1.
 2. With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With
-   any other (SLOOP, ...), or none, the LED goes yellow: switch the FM-1 off, then on.
-3. The FM-1 shows the list (LED cyan). Turn any knob to move, press any button to pick (and again to be sure), or a
-   piano key to jump to its row. The top row keeps what's on it.
-4. The board writes it (magenta), and the FM-1 starts it (green). Red: it didn't; the page's Firmwares tab shows the
-   board's log.
+   any other (SLOOP, ...), or none, the LED blinks slowly: switch the FM-1 off, then on.
+3. The FM-1 shows the list, and both batteries at the top (the LED on, with a short gap each second). Turn any knob
+   to move, press any button to pick (and again to be sure), or a piano key to jump to its row. To keep what's on
+   it, switch the FM-1 off and on.
+4. The board writes it (a fast blink), and the FM-1 starts it: the LED on. Three blips and a pause: it didn't (the
+   page's Firmwares tab shows the board's log). Then the board goes to sleep.
 
 Until a firmware is picked, nothing is written. Only the firmware's own image is written (from `0x4000` to its end:
 `0x93000` for most, baudgirl `0xBA000`, stock V16 `0xA9000`), never the flash's head (what the chip starts from), and
@@ -48,7 +57,7 @@ flash as the firmware's startup leaves it, and the boot ROM doesn't.
 
 The ESP32 side (`esp32/`) builds on fm1buddy's board code (`third_party/fm1buddy`: the USB host, the key, packages),
 with the boot ROM protocol in `esp32/rom.cpp`. The firmwares and JieLi's loader are files in the board's flash
-(LittleFS, about 13 MB: some 20 firmwares). On a computer, the board is a serial port that the web page talks to
+(LittleFS: the rest of its flash). On a computer, the board is a serial port that the web page talks to
 (`esp32/main.cpp` has the commands).
 
 ## Build
@@ -59,11 +68,13 @@ board's program has the picker in it:
 ```sh
 git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/picker.bin
-pio run -e lil -t upload                             # the board
+pio run -e xiaoplus -t upload                        # the board
 npm run fmt                                          # the web page's formatting
 ```
 
-`pio run -e cyd` is the same on an fm1buddy board (the CYD-S3), with what it's doing on its screen too: handy while
+Other ESP32-S3 boards with PSRAM build too (`platformio.ini`: `xiao`, the XIAO ESP32S3, 8 MB; `zero`, the Waveshare
+ESP32-S3-Zero, 4 MB, RGB LED; `devkit`, any N16R8), with `pio run -e NAME -t upload`. `pio run -e cyd` is the same on
+an fm1buddy board (the CYD-S3), with what it's doing on its screen too: handy while
 working on it. CI (`.github/workflows/build.yml`) builds both, and on `main` puts the page on GitHub Pages with the
 program next to it.
 

@@ -28,13 +28,20 @@
         <section class="panel">
           <h2>You need</h2>
           <ul>
-            <li>an <strong>ESP32-S3 board with 16 MB flash and PSRAM</strong> (N16R8, like the ESP32-S3-DevKitC-1 N16R8), its USB-C port on the chip's own USB (not a USB-serial chip). Its RGB LED (GPIO 48) says what it's doing.</li>
-            <li>a battery for it (it's the FM-1's USB host: the FM-1 on its own battery, the two on one USB-C data cable)</li>
+            <li>
+              <a href="https://www.aliexpress.us/item/3256808143430495.html"><strong>Seeed XIAO ESP32S3 Plus</strong></a
+              >: 21 × 18 mm, room for about 20 firmwares, a battery charger on board, and it reads its battery (the FM-1 shows its level). Its LED blinks what it's doing.
+            </li>
+            <li>
+              <a href="https://www.aliexpress.us/item/3256802077349750.html"><strong>a 3.7 V 180 mAh LiPo with bare wires</strong></a
+              >: solder it to the BAT+ and BAT− pads on the XIAO's back. <strong>Check the polarity with a meter first</strong>: the wire colours on these aren't always right. A firmware switch takes a few mAh, and the XIAO charges it from its USB-C (its red LED flashes while it does, and goes out when it's full).
+            </li>
             <li>Chrome or Edge on a computer, and a USB-C cable that carries data</li>
           </ul>
+          <p>No power switch: when it's done, or nothing happens for a while, the board goes to deep sleep (months on that battery). <strong>Press its reset button to wake it.</strong></p>
           <h2>1. The program</h2>
-          <p>Plug the board into this computer and press Install. A new board: let it erase. To update one, don't: its firmwares stay.</p>
-          <esp-web-install-button id="install" manifest="fw/manifest.json">
+          <p>Plug the XIAO into this computer and press Install. A new board: let it erase. To update one, don't: its firmwares stay.</p>
+          <esp-web-install-button id="install" manifest="fw/xiaoplus/manifest.json">
             <button slot="activate" class="button">Install lilfm1buddy</button>
             <span slot="unsupported">Your browser can't: use Chrome or Edge on a computer.</span>
             <span slot="not-allowed">This page has to be opened over https.</span>
@@ -97,12 +104,41 @@
       <div data-page="use" hidden>
         <section class="panel">
           <ol>
-            <li>Both on battery: plug the board into the FM-1 with a USB-C data cable (no hub, no charger), and switch them on.</li>
-            <li>With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With any other (SLOOP, ...), or none: the LED goes <span class="dot yellow"></span> yellow. Switch the FM-1 off, then on.</li>
-            <li>The FM-1 shows the list (the LED <span class="dot cyan"></span> cyan). Turn any knob to move, press any button to pick, and again to be sure. A piano key jumps to its row. The top row keeps what's on it.</li>
-            <li>The board writes it (<span class="dot magenta"></span> magenta), then the FM-1 starts it: <span class="dot green"></span> green. <span class="dot red"></span> Red: it didn't (the Firmwares tab shows the board's log). Unplug the board.</li>
+            <li>Press the XIAO's reset button to wake it, and plug it into the FM-1 (switched on) with a USB-C data cable: no hub, no charger.</li>
+            <li>With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With any other (SLOOP, ...), or none, the LED says <em>switch it off, then on</em>: do.</li>
+            <li>The FM-1 shows the list. Turn any knob to move, press any button to pick, and again to be sure. A piano key jumps to its row. The top of the screen shows both batteries: the FM-1's, and the XIAO's.</li>
+            <li>The board writes it, then the FM-1 starts it, and the board goes to sleep. Unplug it.</li>
           </ol>
-          <p>Until a firmware is picked nothing is written: switching the FM-1 off and on brings its firmware back. Only the firmware's own image is written, never the flash's head (what the chip starts from), and the chip's boot loader is in its ROM: nothing here can make it unrecoverable.</p>
+          <h2>The XIAO's LED</h2>
+          <table>
+            <tbody>
+              <tr>
+                <td>looking for the FM-1</td>
+                <td>a blip a second</td>
+              </tr>
+              <tr>
+                <td>switch the FM-1 off, then on</td>
+                <td>a slow blink</td>
+              </tr>
+              <tr>
+                <td>pick one on the FM-1</td>
+                <td>on, a short gap a second</td>
+              </tr>
+              <tr>
+                <td>writing it</td>
+                <td>a fast blink</td>
+              </tr>
+              <tr>
+                <td>done</td>
+                <td>on (then it sleeps)</td>
+              </tr>
+              <tr>
+                <td>it didn't (the Firmwares tab shows its log)</td>
+                <td>three blips, a pause</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>Until a firmware is picked nothing is written: to keep what's on it, switch the FM-1 off and on. Only the firmware's own image is written, never the flash's head (what the chip starts from), and the chip's boot loader is in its ROM: nothing here can make it unrecoverable.</p>
           <p>How it works, and the code: <a href="https://github.com/konsumer/lilfm1buddy">github.com/konsumer/lilfm1buddy</a>. Its bigger sibling, with a touch screen, Wi-Fi and MIDI routing: <a href="https://konsumer.github.io/fm1buddy/">fm1buddy</a>.</p>
         </section>
       </div>

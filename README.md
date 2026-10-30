@@ -33,8 +33,8 @@ and settings: read the flash before switching away, and put them back when switc
   (`ldr_screen.c`), is a USB-MIDI device and answers M-UPGRADE as `ota-FM-1_900`. The picker is this plus a menu.
 - `boards/fm1/`: the LCD, key scan, knobs and LEDs.
 
-The ESP32 side is fm1buddy's code: the boot ROM protocol and key (`uboot.cpp`, `key_s3.cpp`), the USB host, and the
-M-UPGRADE installer (`fm1.cpp`).
+The ESP32 side is fm1buddy's board code (the USB host, the key at power-on: `key_s3.cpp`, packages: `fm1.cpp`), and
+its boot ROM protocol (`uboot.cpp`), in `esp32/rom.cpp` with its files from the board's flash.
 
 ## Plan
 

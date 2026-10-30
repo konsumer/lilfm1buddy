@@ -11,9 +11,18 @@ Working on hardware (2026-10-30): fomajam and baudgirl installed from the FM-1's
 
 ## You need
 
-- an ESP32-S3 board with **16 MB flash and PSRAM** (N16R8, like the ESP32-S3-DevKitC-1 N16R8), its USB-C port on the
-  chip's own USB. Its RGB LED (GPIO 48) says what it's doing
-- a battery for it: it's the FM-1's USB host. Each on its own battery, one USB-C data cable between them, no hub
+One of these ESP32-S3 boards (the web page installs each):
+
+| Board | Size | Firmwares | Power | LED |
+| --- | --- | --- | --- | --- |
+| **Seeed XIAO ESP32S3** (suggested) | 21 × 18 mm | about 10 (8 MB flash) | LiPo charger on board, BAT pads on its back | one colour: blinks |
+| Waveshare ESP32-S3-Zero | 24 × 18 mm | 3 or 4 (4 MB flash) | none: a LiPo and a charger board on its 5V pin (3.7 to 6 V) | RGB on GPIO 21 |
+| any ESP32-S3 N16R8 (DevKitC-1, ...) | bigger | about 20 (16 MB flash) | its other USB port (a power bank) | RGB on GPIO 48 |
+
+And a battery: the board is the FM-1's USB host, each on its own battery, one USB-C data cable between them, no
+hub. It's only on for a minute or two at a time: a single-cell (1S, 3.7 V) LiPo **with a protection circuit**, 300 to
+500 mAh, is plenty (the XIAO charges it at about 100 mA). Check its polarity with a meter before soldering it to the
+XIAO's pads: the wires on these packs aren't always where their plug says.
 
 ## Use it
 
@@ -23,7 +32,7 @@ Working on hardware (2026-10-30): fomajam and baudgirl installed from the FM-1's
 3. The FM-1 shows the list (LED cyan). Turn any knob to move, press any button to pick (and again to be sure), or a
    piano key to jump to its row. The top row keeps what's on it.
 4. The board writes it (magenta), and the FM-1 starts it (green). Red: it didn't; the page's Firmwares tab shows the
-   board's log.
+   board's log. (The XIAO's one LED blinks instead: the page's "Use it" tab has them.)
 
 Until a firmware is picked, nothing is written. Only the firmware's own image is written (from `0x4000` to its end:
 `0x93000` for most, baudgirl `0xBA000`, stock V16 `0xA9000`), never the flash's head (what the chip starts from), and
@@ -48,7 +57,7 @@ flash as the firmware's startup leaves it, and the boot ROM doesn't.
 
 The ESP32 side (`esp32/`) builds on fm1buddy's board code (`third_party/fm1buddy`: the USB host, the key, packages),
 with the boot ROM protocol in `esp32/rom.cpp`. The firmwares and JieLi's loader are files in the board's flash
-(LittleFS, about 13 MB: some 20 firmwares). On a computer, the board is a serial port that the web page talks to
+(LittleFS: the rest of its flash). On a computer, the board is a serial port that the web page talks to
 (`esp32/main.cpp` has the commands).
 
 ## Build
@@ -59,7 +68,7 @@ board's program has the picker in it:
 ```sh
 git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/picker.bin
-pio run -e lil -t upload                             # the board
+pio run -e xiao -t upload                            # the board: xiao, zero or devkit
 npm run fmt                                          # the web page's formatting
 ```
 

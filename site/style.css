@@ -217,6 +217,9 @@ td:last-child {
   vertical-align: -0.05em;
 }
 
+.blue {
+  background: #2f6fd6;
+}
 .yellow {
   background: #f2c200;
 }
@@ -275,4 +278,39 @@ select {
 
 h2 a {
   color: inherit;
+}
+
+.boards {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+
+.board {
+  display: block;
+  padding: 10px 12px 10px 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+}
+
+.board input {
+  position: absolute;
+  left: 12px;
+  top: 14px;
+  accent-color: var(--accent);
+}
+
+.board:has(input:checked) {
+  border-color: var(--accent);
+}
+
+.tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 0.75rem;
+  font-weight: 600;
 }

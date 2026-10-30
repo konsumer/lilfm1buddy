@@ -208,29 +208,22 @@ const char* rom::loader(const uint8_t* image, uint32_t n, Chip& chip) {
   return 0;
 }
 
-const char* rom::read(const Chip& chip, std::vector<uint8_t>& out, void (*progress)(uint32_t, uint32_t)) {
-  out.assign(chip.size, 0);
+const char* rom::read(const Chip& chip, uint32_t addr, uint8_t* out, uint32_t n) {
   uint32_t io = chip.io >= IO ? chip.io : IO;
-  for (uint32_t at = 0; at < chip.size; at += io) {
-    uint32_t n = std::min(io, chip.size - at);
+  for (uint32_t at = 0; at < n; at += io) {
+    uint32_t k = std::min(io, n - at);
     uint8_t args[6], cdb[16];
-    be32(args, at);
-    args[4] = n >> 8, args[5] = n & 0xFF;
+    be32(args, addr + at);
+    args[4] = k >> 8, args[5] = k & 0xFF;
     cdbOf(cdb, READ_FLASH, args, 6);
     bool ok = false;
     for (int t = 0; t < 3 && !ok; t++) {
       uint32_t got = 0;
-      ok = hal::storageCommand(cdb, 16, true, &out[at], n, &got, 2000) && got == n;
+      ok = hal::storageCommand(cdb, 16, true, out + at, k, &got, 2000) && got == k;
     }
     if (!ok) {
       return "It stopped answering.";
     }
-    if (progress && !(at % (16 * io))) {
-      progress(at, chip.size);
-    }
-  }
-  if (progress) {
-    progress(chip.size, chip.size);
   }
   return 0;
 }

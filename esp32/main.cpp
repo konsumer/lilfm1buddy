@@ -31,6 +31,7 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -74,10 +75,48 @@ static int line;
 #endif
 static bool fsOk;
 
-// the LED: what it's doing
-static void led(uint8_t r, uint8_t g, uint8_t b) {
+// the LED: what it's doing. An RGB LED (LED_RGB) in colours; one of a colour (LED_PIN, LED_ON its level when lit) in
+// blinks, on and off times in ms:
+//   looking for the FM-1    blue      a blip a second
+//   switch it off, then on  yellow    a slow blink
+//   pick one on the FM-1    cyan      on, a short gap a second
+//   writing                 magenta   a fast blink
+//   done                    green     on
+//   it didn't               red       three blips, a pause
+//   on a computer           white     on
+enum Status { LOOKING,
+              SWITCH,
+              PICK,
+              WRITING,
+              DONE,
+              FAILED,
+              COMPUTER };
+static std::atomic<int> status{-1};
+
+#ifdef LED_PIN
+static void blinkTask(void*) {
+  static const uint16_t BLINKS[][6] = {{100, 900}, {500, 500}, {900, 100}, {100, 100}, {1000, 0}, {100, 150, 100, 150, 100, 1000}, {1000, 0}};
+  pinMode(LED_PIN, OUTPUT);
+  for (;;) {
+    int s = status;
+    if (s < 0) {
+      digitalWrite(LED_PIN, !LED_ON);
+      delay(50);
+      continue;
+    }
+    for (int i = 0; i < 6 && BLINKS[s][i] && status == s; i++) {
+      digitalWrite(LED_PIN, i % 2 ? !LED_ON : LED_ON);
+      delay(BLINKS[s][i]);
+    }
+  }
+}
+#endif
+
+static void led(Status s) {
+  status = s;
 #ifdef LED_RGB
-  rgbLedWrite(LED_RGB, r, g, b);
+  static const uint8_t RGB[][3] = {{0, 0, 64}, {64, 48, 0}, {0, 48, 48}, {48, 0, 48}, {0, 64, 0}, {64, 0, 0}, {16, 16, 16}};
+  rgbLedWrite(LED_RGB, RGB[s][0], RGB[s][1], RGB[s][2]);
 #endif
 }
 
@@ -110,7 +149,7 @@ static void say(uint16_t color, const char* fmt, ...) {
 }
 
 static void fail(const char* e) {
-  led(64, 0, 0);
+  led(FAILED);
   say(TFT_RED, "%s", e);
   say(TFT_WHITE, "Done. Reset this board to try again.");
 }
@@ -188,7 +227,7 @@ static int findPicker(uint32_t ms) {
 // the FM-1 into its boot ROM: 0 there, or an error (after it's restarted into key mode: never returns then)
 static const char* toRom() {
   if (hal::recoveryMode()) {
-    led(64, 48, 0);
+    led(SWITCH);
     say(TFT_CYAN, "Switch the FM-1 OFF, then ON");
     hal::keyStart();
     for (int last = -1; hal::keyState() != hal::KEY_HOST; delay(50)) {
@@ -254,17 +293,6 @@ static int listen(int d, const std::vector<Firmware>& list) {
   }
 }
 
-static void reading(uint32_t done, uint32_t total) {
-  static uint32_t shown;
-  if (done < shown) {
-    shown = 0;
-  }
-  if (done >= shown + 256 * 1024 || done == total) {
-    say(TFT_CYAN, "  read %u of %u KB", (unsigned)(done / 1024), (unsigned)(total / 1024));
-    shown = done;
-  }
-}
-
 // firmware f onto the FM-1 (device d, the picker), with JieLi's loader: 0, or an error
 static const char* install(int d, const Firmware& f, const std::vector<uint8_t>& loader) {
   static Pkg pkg;
@@ -282,44 +310,39 @@ static const char* install(int d, const Firmware& f, const std::vector<uint8_t>&
   const uint8_t* want = pkg.image + at;
   uint32_t end = n;  // (as far as its image goes: 0x93000 for most, more for some: baudgirl 0xBA000, stock V16 0xA9000)
   rom::Chip chip;
-  led(48, 0, 48);
+  led(WRITING);
   say(TFT_WHITE, "To its boot ROM, and JieLi's loader");
   if ((e = rom::enter(d)) || (e = rom::attach(10000)) || (e = rom::loader(loader.data(), loader.size(), chip))) {
     return e;
   }
-  std::vector<uint8_t> now;
+  // a sector at a time: read, and written only if it differs (no copy of the whole flash: 2 MB of PSRAM is enough)
   if (chip.key != FM1_KEY || chip.flashId != FM1_FLASH || chip.size < WRITE_TO) {
     e = "That isn't the FM-1's chip: nothing was written.";
-  } else {
-    say(TFT_WHITE, "Reading its flash");
-    e = rom::read(chip, now, reading);
   }
-  std::vector<uint32_t> sectors;
-  for (uint32_t a = WRITE_FROM; !e && a < end; a += SECTOR) {
-    if (memcmp(want + a, &now[a], std::min<uint32_t>(SECTOR, end - a))) {
-      sectors.push_back(a);
+  uint32_t total = (end - WRITE_FROM + SECTOR - 1) / SECTOR, written = 0;
+  static uint8_t now[SECTOR], sec[SECTOR];
+  for (uint32_t a = WRITE_FROM, k = 1; !e && a < end; a += SECTOR, k++) {
+    uint32_t n = std::min<uint32_t>(SECTOR, end - a);
+    if ((e = rom::read(chip, a, now, SECTOR))) {
+      break;
     }
-  }
-  if (!e) {
-    say(TFT_WHITE, "Writing %u sectors", (unsigned)sectors.size());
-  }
-  uint8_t sec[SECTOR];
-  for (size_t k = 0; !e && k < sectors.size(); k++) {
-    uint32_t a = sectors[k];
-    memcpy(sec, &now[a], SECTOR);  // (the end of a short image: as it is)
-    memcpy(sec, want + a, std::min<uint32_t>(SECTOR, end - a));
-    for (int t = 0; t < 3; t++) {
-      if (!(e = rom::writeSector(a, sec))) {
-        break;
+    if (memcmp(want + a, now, n)) {
+      memcpy(sec, now, SECTOR);  // (the end of a short image: as it is)
+      memcpy(sec, want + a, n);
+      for (int t = 0; t < 3; t++) {
+        if (!(e = rom::writeSector(a, sec))) {
+          break;
+        }
+        hal::log("lil: sector %06X: %s", (unsigned)a, e);
       }
-      hal::log("lil: sector %06X: %s", (unsigned)a, e);
+      written++;
     }
-    if ((k + 1) % 16 == 0 || k + 1 == sectors.size()) {
-      say(TFT_CYAN, "  %u of %u", (unsigned)(k + 1), (unsigned)sectors.size());
+    if (k % 32 == 0 || k == total) {
+      say(TFT_CYAN, "  %u of %u sectors, %u written", (unsigned)k, (unsigned)total, (unsigned)written);
     }
   }
   rom::leave();  // (it restarts: into the new firmware)
-  if (e && !sectors.empty()) {
+  if (e && written) {
     static std::string err;
     err = std::string(e) + " Reset this board to try again before switching the FM-1 off.";
     return err.c_str();
@@ -332,7 +355,7 @@ static void run(void*) {
   std::vector<Firmware> list;
   const char* e = 0;
   char sha[65];
-  led(0, 0, 64);
+  led(LOOKING);
   if (!fsOk) {
     e = "Its flash didn't mount.";
   } else if (!hal::sha256(LOADER, sha) || strcmp(sha, LOADER_SHA256) || !load(LOADER, loader, LOADER_SIZE)) {
@@ -356,7 +379,7 @@ static void run(void*) {
     fail("The picker didn't show up on USB.");
     return vTaskDelete(0);
   }
-  led(0, 48, 48);
+  led(PICK);
   say(TFT_GREEN, "Pick one on the FM-1.");
   int i = listen(d, list);
   if (i < 0) {
@@ -367,7 +390,7 @@ static void run(void*) {
   if ((e = install(d, list[i], loader))) {
     fail(e);
   } else {
-    led(0, 64, 0);
+    led(DONE);
     say(TFT_GREEN, "Installed. Unplug this board.");
   }
   vTaskDelete(0);
@@ -532,6 +555,9 @@ void setup() {
   Serial.setRxBufferSize(2 * PIECE);
   Serial.begin(115200);
   board::begin();
+#ifdef LED_PIN
+  xTaskCreatePinnedToCore(blinkTask, "led", 2048, 0, 1, 0, 1);
+#endif
   fsOk = LittleFS.begin(true, FS);  // (a new board: its flash formatted, once)
   if (fsOk && !hal::onComputer() && !hal::recoveryMode()) {
     remove(LOG);  // (a new log for each try; key mode's restart goes on with it)
@@ -543,7 +569,7 @@ void setup() {
 #endif
   say(TFT_WHITE, "lilfm1buddy " VERSION);
   if (hal::onComputer()) {
-    led(16, 16, 16);
+    led(COMPUTER);
     say(TFT_WHITE, "On a computer: the web page's serial port");
     return;
   }

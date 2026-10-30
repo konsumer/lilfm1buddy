@@ -3,7 +3,7 @@
 A tiny ESP32-S3 that plugs straight into the FM-1's USB port and lets you switch its firmware from the FM-1 itself:
 no screen, no buttons, no MIDI. Plug it in, pick a firmware on the FM-1's screen with its keys, and it's installed.
 
-Not working yet: this is the plan, and the first experiment.
+Early: the picker and the install are written, not yet tried on hardware together.
 
 ## How it works
 

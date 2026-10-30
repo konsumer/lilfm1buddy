@@ -1,4 +1,6 @@
 .pio/
 build/
 .DS_Store
+node_modules/
+site/fw/
 data/

@@ -1,0 +1,69 @@
+# Builds the picker (JieLi's toolchain) and the board's program (lil, and cyd to see that it still builds). On main,
+# the web page (site/) goes to GitHub Pages with the program next to it (site/fw/). Settings -> Pages -> Source: GitHub
+# Actions.
+name: build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: actions/cache@v4
+        with:
+          path: ~/.jieli
+          key: jieli-toolchain-1
+      - name: JieLi's toolchain
+        run: |
+          if [ ! -e ~/.jieli/toolchain ]; then
+            mkdir -p ~/.jieli
+            curl -fL --retry 3 https://pkgman.jieliapp.com/s/linux-toolchain | tar -xJ -C ~/.jieli
+            ln -sfn "$(basename "$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)")" ~/.jieli/toolchain
+          fi
+      - run: JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install platformio
+      - run: pio run -e lil -e cyd
+      - name: the page, with the program
+        run: |
+          version="$(git describe --tags --always)"
+          mkdir -p site/fw
+          cp .pio/build/lil/firmware.factory.bin site/fw/lilfm1buddy.bin
+          jq -n --arg v "$version" '{name: "lilfm1buddy", version: $v, new_install_prompt_erase: true,
+            builds: [{chipFamily: "ESP32-S3", parts: [{path: "lilfm1buddy.bin", offset: 0}]}]}' > site/fw/manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            site/fw/lilfm1buddy.bin
+            build/picker.bin
+          if-no-files-found: error
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: site
+
+  pages:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

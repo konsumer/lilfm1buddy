@@ -76,19 +76,21 @@ static int findFm1(uint32_t ms) {
 // the USB port as the S3's controller sees it (HPRT): connected (something pulls D+ or D- up), enabled (reset done),
 // the lines (D+, D-) and the speed
 #define HPRT (0x60080000u + 0x440)
+#define HAINTMSK (0x60080000u + 0x418)
 static uint32_t port() {
   uint32_t h = REG_READ(HPRT);
-  return (h & 1) | (h & 4) >> 1 | (h >> 10 & 3) << 2 | (h >> 17 & 3) << 4;
+  return (h & 1) | (h & 4) >> 1 | (h >> 10 & 3) << 2 | (h >> 17 & 3) << 4 | (REG_READ(HAINTMSK) & 0xFF) << 8;
 }
 
 static void sayPort(uint32_t p) {
   static const char* SPEED[] = {"high", "full", "low", "?"};
-  say(TFT_CYAN, "port: %s%s, D+ %d D- %d, %s speed", p & 1 ? "connected" : "empty", p & 2 ? ", enabled" : "",
-      (int)(p >> 2 & 1), (int)(p >> 3 & 1), SPEED[p >> 4 & 3]);
+  say(TFT_CYAN, "port: %s%s, D+ %d D- %d, %s, ch %02X", p & 1 ? "connected" : "empty", p & 2 ? ", enabled" : "",
+      (int)(p >> 2 & 1), (int)(p >> 3 & 1), SPEED[p >> 4 & 3], (unsigned)(p >> 8 & 0xFF));
 }
 
-// the USB port and the devices on it, as they change, for a while
-static void watch(uint32_t ms) {
+// the USB port and the devices on it, as they change, for a while; whether a device came
+static bool watch(uint32_t ms) {
+  bool came = false;
   uint32_t seen[MIDI_USB] = {}, last = 0xFFFF;
   bool mounted[CFG_TUH_DEVICE_MAX + 1] = {};
   for (uint32_t start = millis(); millis() - start < ms; delay(20)) {
@@ -104,6 +106,7 @@ static void watch(uint32_t ms) {
         if (m) {
           tuh_vid_pid_get(a, &vid, &pid);
           say(TFT_GREEN, "device %u: %04X:%04X", a, vid, pid);
+          came = true;
         } else {
           say(TFT_YELLOW, "device %u went", a);
         }
@@ -119,10 +122,11 @@ static void watch(uint32_t ms) {
     }
     if (hal::storageSeen(ROM_VID, ROM_PID)) {
       say(TFT_YELLOW, "The boot ROM is back (the picker crashed?)");
-      return;
+      return came;
     }
   }
   sayPort(port());
+  return came;
 }
 
 static void test(void*) {
@@ -184,23 +188,62 @@ static void test(void*) {
   }
   say(TFT_GREEN, "Jumped. Watching USB for 30 s:");
   say(TFT_GREEN, "(the FM-1 should say UPDATING)");
-  watch(30000);
+  // the jump's transfer was cut off as the ROM left: TinyUSB never frees that channel, and may not take the next
+  // device (fm1buddy's hal::usbRestart, after a boot ROM job, is for the same)
+  if (!watch(3000)) {
+    say(TFT_YELLOW, "No device yet: restarting the USB host");
+    hal::usbRestart();
+    watch(30000);
+  }
   say(TFT_WHITE, "Done. Switch the FM-1 off and on.");
   vTaskDelete(0);
 }
 
+// on a computer: its serial port, for tools/s3.py (fm1buddy's) log, cat PATH and ls [PATH]
+static void console() {
+  static char line[160];
+  static uint8_t n;
+  while (Serial.available() > 0) {
+    char c = Serial.read();
+    if (c != '\n' && c != '\r') {
+      if (n < sizeof line - 1) {
+        line[n++] = c;
+      }
+      continue;
+    }
+    line[n] = 0;
+    n = 0;
+    if (!strcmp(line, "log")) {
+      board::printLog();
+    } else if (!strncmp(line, "cat ", 4)) {
+      board::printFile(line + 4);
+    } else if (!strcmp(line, "ls") || !strncmp(line, "ls ", 3)) {
+      board::printDir(line[2] ? line + 3 : "");
+    }
+  }
+}
+
 void setup() {
+  Serial.begin(115200);
   board::begin();
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
   say(TFT_WHITE, "lilfm1buddy test");
+  if (hal::onComputer()) {
+    say(TFT_WHITE, "On a computer: serial console");
+    say(TFT_WHITE, "  third_party/fm1buddy/tools/s3.py log");
+    return;
+  }
   // the serial port off first, in recovery mode: Serial.end() drives D+ and D- low, and the key is on them
   board::usbBegin();
   xTaskCreatePinnedToCore(test, "test", 8192, 0, 1, 0, 1);
 }
 
 void loop() {
+  if (hal::onComputer()) {
+    console();
+  }
   board::loop();  // (the log: only the main loop writes it)
   delay(5);
 }

@@ -1,6 +1,6 @@
 #!/bin/sh
-# Build the picker's RAM image: build/picker.bin (load and jump to 0x01C0A800).
-# For now (phase 1) it's felucca-bsp's update loader as it is: does it run when the boot ROM starts it?
+# Build the picker's RAM image: build/picker.bin (load and jump to 0x01C0A800). It's felucca-bsp's update loader
+# (its crt0 and linker script, ldr_core.c) with a menu in front (picker.c, screen.c).
 #   JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh
 # The toolchain is Linux-only (felucca's tools/get_toolchain.sh fetches it). On macOS it runs in Docker.
 set -e
@@ -22,9 +22,9 @@ run() {  # TOOL ARGS... (paths relative to ROOT)
 }
 
 CC="pi32v2/bin/clang"
-FLAGS="-target pi32v2 -Os -ffunction-sections -fno-builtin -Wall -Wno-unused-function -I$BSP/chip -I$BSP/boards/fm1"
+FLAGS="-target pi32v2 -Os -ffunction-sections -fno-builtin -Wall -Wno-unused-function -Ipicker -I$BSP/chip -I$BSP/boards/fm1 -I$BSP/loader"
 run $CC -target pi32v2 -c $BSP/loader/crt0_ldr.S -o $OUT/crt0_ldr.o
-run $CC $FLAGS -c $BSP/loader/loader.c -o $OUT/picker.o
+run $CC $FLAGS -c picker/picker.c -o $OUT/picker.o
 run pi32v2/bin/ld --gc-sections -e _start -T $BSP/loader/loader.ld $OUT/crt0_ldr.o $OUT/picker.o -o $OUT/picker.elf
 run common/bin/objcopy -O binary -j .text $OUT/picker.elf $OUT/picker.bin
 echo "picker.bin: $(wc -c <"$ROOT/$OUT/picker.bin") bytes (at most 81920)"

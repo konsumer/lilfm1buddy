@@ -1,26 +1,32 @@
-// cyd-test: does a program of ours run in the FM-1's RAM, started by its boot ROM? On an fm1buddy board (the CYD-S3),
-// with the FM-1 on its USB port. What happens is on the screen, and in fm1buddy/log.txt on the SD card.
+// lilfm1buddy on an fm1buddy board (the CYD-S3), with the FM-1 on its USB port: pick a firmware on the FM-1 itself,
+// from the ones on the SD card (/fm1/*.fwsc, named as fm1buddy names them). What happens is on the board's screen,
+// and in fm1buddy/log.txt on the SD card.
 //
-//   1. the picker from the SD card: lilfm1buddy/picker.bin (picker/build.sh)
-//   2. the FM-1 into its boot ROM: SysEx to its firmware (stock V15, Felucca-based ones). If that doesn't work, the
+//   1. the FM-1 into its boot ROM: SysEx to its firmware (stock V15, Felucca-based ones). If that doesn't work, the
 //      board restarts into fm1buddy's recovery mode, and the key does it as the FM-1 is switched on
-//   3. the picker into its RAM, and a jump to it. Nothing is written to its flash: switching the FM-1 off and on
-//      brings its firmware back
-//   4. the USB devices that come next (the picker for now: felucca-bsp's update loader, "ota-FM-1_900")
+//   2. the picker (lilfm1buddy/picker.bin, picker/build.sh) into its RAM, and a jump to it. Nothing is written to its
+//      flash yet: switching the FM-1 off and on brings its firmware back
+//   3. the picker asks for the list (picker.c says how), shows it, and says which one
+//   4. that one is installed to it, as fm1buddy installs (fm1::install: the picker is an update loader)
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <stdarg.h>
 
+#include <string>
 #include <vector>
 
 #include "board.h"
+#include "catalog.h"
 #include "fm1.h"
 #include "hal.h"
 #include "midi.h"
 #include "rom.h"
-#include "tusb.h"
 
 #define PICKER "/sdcard/lilfm1buddy/picker.bin"
+#define PICKER_VID 0x1209
+#define PICKER_PID 0x0002
+#define LIST_MAX 24  // picker.c's PK_MAX
+#define NAME_MAX 20  // and PK_NAME
 #define LINE_H 16
 
 static TFT_eSPI tft;
@@ -34,7 +40,7 @@ static void say(uint16_t color, const char* fmt, ...) {
   va_start(a, fmt);
   vsnprintf(s, sizeof s, fmt, a);
   va_end(a);
-  hal::log("test: %s", s);
+  hal::log("lil: %s", s);
   if (line + LINE_H > tft.height()) {
     tft.fillScreen(TFT_BLACK);
     line = 0;
@@ -46,7 +52,7 @@ static void say(uint16_t color, const char* fmt, ...) {
 
 static void fail(const char* e) {
   say(TFT_RED, "%s", e);
-  say(TFT_WHITE, "Done. Switch the FM-1 off and on.");
+  say(TFT_WHITE, "Done. Reset this board to try again.");
 }
 
 static bool loadPicker(std::vector<uint8_t>& out) {
@@ -61,6 +67,33 @@ static bool loadPicker(std::vector<uint8_t>& out) {
   return n > 0 && n <= PICKER_MAX;
 }
 
+// the firmwares on the SD card, as fm1buddy lists them
+static std::vector<Firmware> firmwares() {
+  std::string err;
+  catalog::parseHub(catalog::hub, catalog::hubUpdated, err);  // (names from the Hub's list, if it's there)
+  catalog::scanSd();
+  std::vector<Firmware> l = catalog::sd;
+  if (l.size() > LIST_MAX) {
+    l.resize(LIST_MAX);
+  }
+  return l;
+}
+
+// its name for the FM-1's screen: 7-bit, NAME_MAX at most
+static std::string shortName(const Firmware& f) {
+  std::string n = f.name.empty() ? f.file : f.name + (f.version.empty() ? "" : " " + f.version);
+  if (f.name.empty() && n.size() > 5 && n.compare(n.size() - 5, 5, ".fwsc") == 0) {
+    n.resize(n.size() - 5);
+  }
+  std::string out;
+  for (char c : n) {
+    if (out.size() < NAME_MAX) {
+      out += c >= 0x20 && c < 0x7F ? c : '?';
+    }
+  }
+  return out;
+}
+
 // a running FM-1 on the USB host, within ms: its device, or -1
 static int findFm1(uint32_t ms) {
   for (uint32_t start = millis(); millis() - start < ms; delay(100)) {
@@ -73,123 +106,143 @@ static int findFm1(uint32_t ms) {
   return -1;
 }
 
-// the USB port as the S3's controller sees it (HPRT): connected (something pulls D+ or D- up), enabled (reset done),
-// the lines (D+, D-) and the speed
-#define HPRT (0x60080000u + 0x440)
-#define HAINTMSK (0x60080000u + 0x418)
-static uint32_t port() {
-  uint32_t h = REG_READ(HPRT);
-  return (h & 1) | (h & 4) >> 1 | (h >> 10 & 3) << 2 | (h >> 17 & 3) << 4 | (REG_READ(HAINTMSK) & 0xFF) << 8;
-}
-
-static void sayPort(uint32_t p) {
-  static const char* SPEED[] = {"high", "full", "low", "?"};
-  say(TFT_CYAN, "port: %s%s, D+ %d D- %d, %s, ch %02X", p & 1 ? "connected" : "empty", p & 2 ? ", enabled" : "",
-      (int)(p >> 2 & 1), (int)(p >> 3 & 1), SPEED[p >> 4 & 3], (unsigned)(p >> 8 & 0xFF));
-}
-
-// the USB port and the devices on it, as they change, for a while; whether a device came
-static bool watch(uint32_t ms) {
-  bool came = false;
-  uint32_t seen[MIDI_USB] = {}, last = 0xFFFF;
-  bool mounted[CFG_TUH_DEVICE_MAX + 1] = {};
-  for (uint32_t start = millis(); millis() - start < ms; delay(20)) {
-    uint32_t p = port();
-    if (p != last) {
-      sayPort(p);
-      last = p;
-    }
-    for (uint8_t a = 1; a <= CFG_TUH_DEVICE_MAX; a++) {
-      bool m = tuh_mounted(a);
-      if (m != mounted[a]) {
-        uint16_t vid = 0, pid = 0;
-        if (m) {
-          tuh_vid_pid_get(a, &vid, &pid);
-          say(TFT_GREEN, "device %u: %04X:%04X", a, vid, pid);
-          came = true;
-        } else {
-          say(TFT_YELLOW, "device %u went", a);
-        }
-        mounted[a] = m;
-      }
-    }
+// the picker on USB, within ms: its device, or -1
+static int findPicker(uint32_t ms) {
+  for (uint32_t start = millis(); millis() - start < ms; delay(100)) {
     for (int d = 0; d < MIDI_USB; d++) {
       midi::Dev v;
-      if (midi::dev(d, v) && v.on && v.serial != seen[d]) {
-        seen[d] = v.serial;
-        say(TFT_GREEN, "MIDI: %04X:%04X %s", v.vid, v.pid, v.name);
+      if (midi::dev(d, v) && v.on && v.vid == PICKER_VID && v.pid == PICKER_PID) {
+        return d;
       }
     }
-    if (hal::storageSeen(ROM_VID, ROM_PID)) {
-      say(TFT_YELLOW, "The boot ROM is back (the picker crashed?)");
-      return came;
-    }
   }
-  sayPort(port());
-  return came;
+  return -1;
 }
 
-static void test(void*) {
+// the FM-1 into its boot ROM: 0 there, or an error (after it's restarted into key mode: never returns then)
+static const char* toRom() {
+  if (hal::recoveryMode()) {
+    say(TFT_CYAN, "Switch the FM-1 OFF, then ON");
+    hal::keyStart();
+    for (int last = -1; hal::keyState() != hal::KEY_HOST; delay(50)) {
+      int k = hal::keyState();
+      if (k != last) {
+        static const char* NAMES[] = {"", "waiting for it to be off", "sending the key: switch it ON",
+                                      "it took the key", "USB host up"};
+        say(TFT_CYAN, "%s", k >= 0 && k <= hal::KEY_HOST ? NAMES[k] : "?");
+        last = k;
+      }
+    }
+    return rom::attach(15000);
+  }
+  say(TFT_WHITE, "Looking for the FM-1...");
+  int d = findFm1(15000);
+  const char* e = "No FM-1 found.";
+  if (d >= 0) {
+    midi::Dev v;
+    midi::dev(d, v);
+    say(TFT_WHITE, "%s: to its boot ROM", v.name);
+    e = rom::enter(d);
+    if (!e) {
+      e = rom::attach(10000);
+    }
+  }
+  if (e) {  // (SLOOP, say: it doesn't take the SysEx) the key, from recovery mode
+    say(TFT_YELLOW, "%s", e);
+    say(TFT_YELLOW, "Restarting into key mode in 3 s...");
+    delay(3000);
+    hal::recoveryModeSet(true);  // (the board restarts)
+  }
+  return e;
+}
+
+// the picker's side: the list when it asks, until it says which one; that one, or -1 (it went)
+static int listen(int d, const std::vector<Firmware>& list) {
+  static const uint8_t HELLO[] = {0xF0, 0x7D, 0x4C, 0x42, 0x10, 0xF7};
+  for (;;) {
+    midi::Dev v;
+    if (!midi::dev(d, v) || !v.on) {
+      return -1;
+    }
+    uint8_t m[SYSEX_MAX];
+    uint32_t n = midi::sysex(d, m);
+    if (!n) {
+      delay(20);
+      continue;
+    }
+    if (n == sizeof HELLO && !memcmp(m, HELLO, n)) {
+      for (size_t i = 0; i < list.size(); i++) {
+        std::string name = shortName(list[i]);
+        uint8_t out[8 + NAME_MAX] = {0xF0, 0x7D, 0x4C, 0x42, 0x01, (uint8_t)i, (uint8_t)list.size()};
+        memcpy(out + 7, name.data(), name.size());
+        out[7 + name.size()] = 0xF7;
+        midi::sendWait(d, out, 8 + name.size(), 1000);
+      }
+    } else if (n == 7 && !memcmp(m, HELLO, 4) && m[4] == 0x12 && m[5] < list.size()) {
+      return m[5];
+    }
+  }
+}
+
+static void progress(Fm1Step step, uint32_t bytes, uint32_t) {
+  static Fm1Step last = STEP_DONE;
+  static uint32_t shown;
+  static const char* NAMES[] = {"starting", "checking", "the loader", "writing", "restarting", "done"};
+  if (step != last) {
+    say(TFT_CYAN, "install: %s", NAMES[step]);
+    last = step;
+    shown = 0;
+  }
+  if (bytes >= shown + 128 * 1024) {
+    say(TFT_CYAN, "  %u KB", (unsigned)(bytes / 1024));
+    shown = bytes;
+  }
+}
+
+static void run(void*) {
   std::vector<uint8_t> picker;
+  std::vector<Firmware> list;
   const char* e = 0;
   if (!hal::sd()) {
     e = "No SD card.";
   } else if (!loadPicker(picker)) {
     e = "No " PICKER " (or too big).";
+  } else if ((list = firmwares()).empty()) {
+    e = "No firmwares in /fm1 on the SD card.";
   }
-  if (e) {
-    fail(e);
+  if (e || (e = toRom())) {
+    if (e) {
+      fail(e);
+    }
     return vTaskDelete(0);
   }
-  say(TFT_WHITE, "picker.bin: %u bytes", (unsigned)picker.size());
-  if (hal::recoveryMode()) {
-    say(TFT_CYAN, "Key mode: switch the FM-1 OFF, then ON");
-    hal::keyStart();
-    for (int last = -1; hal::keyState() != hal::KEY_HOST; delay(50)) {
-      int k = hal::keyState();
-      if (k != last) {
-        static const char* NAMES[] = {"idle", "waiting for it to be off", "sending the key: switch it ON",
-                                      "it took the key", "USB host up"};
-        say(TFT_CYAN, "key: %s", k >= 0 && k <= hal::KEY_HOST ? NAMES[k] : "?");
-        last = k;
-      }
-    }
-  } else {
-    say(TFT_WHITE, "Looking for a running FM-1...");
-    int d = findFm1(15000);
-    if (d >= 0) {
-      midi::Dev v;
-      midi::dev(d, v);
-      say(TFT_WHITE, "%s: SysEx to its boot ROM", v.name);
-      e = rom::enter(d);
-      if (!e) {
-        e = rom::attach(10000);
-      }
-    } else {
-      e = "No FM-1 found.";
-    }
-    if (e) {  // (SLOOP, say: it doesn't take the SysEx) the key, from recovery mode
-      say(TFT_YELLOW, "%s", e);
-      say(TFT_YELLOW, "Restarting into key mode in 5 s...");
-      delay(5000);
-      hal::recoveryModeSet(true);  // (the board restarts)
-      return vTaskDelete(0);
-    }
-  }
-  if (hal::recoveryMode() && (e = rom::attach(15000))) {
-    fail(e);
-    return vTaskDelete(0);
-  }
-  sayPort(port());
-  say(TFT_WHITE, "Boot ROM: picker to %08X", (unsigned)PICKER_AT);
+  say(TFT_WHITE, "%u firmwares. The picker to the FM-1...", (unsigned)list.size());
   if ((e = rom::run(PICKER_AT, picker.data(), picker.size()))) {
     fail(e);
     return vTaskDelete(0);
   }
-  say(TFT_GREEN, "Jumped. Watching USB for 30 s:");
-  say(TFT_GREEN, "(the FM-1 should say UPDATING)");
-  watch(30000);
-  say(TFT_WHITE, "Done. Switch the FM-1 off and on.");
+  int d = findPicker(10000);
+  if (d < 0) {
+    fail("The picker didn't show up on USB.");
+    return vTaskDelete(0);
+  }
+  say(TFT_GREEN, "Pick one on the FM-1.");
+  int i = listen(d, list);
+  if (i < 0) {
+    fail("The picker went (the FM-1 restarted?).");
+    return vTaskDelete(0);
+  }
+  say(TFT_GREEN, "Installing %s", list[i].file.c_str());
+  Pkg pkg;
+  e = pkg.open(catalog::path(FW_DIR "/" + list[i].file).c_str());
+  if (!e) {
+    e = fm1::install(pkg, progress);
+  }
+  if (e) {
+    fail(e);
+  } else {
+    say(TFT_GREEN, "Installed. Unplug this board.");
+  }
   vTaskDelete(0);
 }
 
@@ -223,7 +276,7 @@ void setup() {
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
-  say(TFT_WHITE, "lilfm1buddy test");
+  say(TFT_WHITE, "lilfm1buddy");
   if (hal::onComputer()) {
     say(TFT_WHITE, "On a computer: serial console");
     say(TFT_WHITE, "  third_party/fm1buddy/tools/s3.py log");
@@ -231,7 +284,7 @@ void setup() {
   }
   // the serial port off first, in recovery mode: Serial.end() drives D+ and D- low, and the key is on them
   board::usbBegin();
-  xTaskCreatePinnedToCore(test, "test", 8192, 0, 1, 0, 1);
+  xTaskCreatePinnedToCore(run, "lil", 16384, 0, 1, 0, 1);
 }
 
 void loop() {

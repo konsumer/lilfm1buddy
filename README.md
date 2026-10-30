@@ -37,9 +37,8 @@ M-UPGRADE installer (`fm1.cpp`).
 
 ## Plan
 
-1. **Does a RAM image run from the boot ROM?** Build felucca-bsp's loader unchanged (`picker/build.sh`), have
-   fm1buddy write it to RAM and jump to it (a console command, like `wl82loader.bin` but at `0x01C0A800`), then look
-   for "UPDATING" on the screen and an `ota-FM-1_900` USB device. If it does, the rest is ordinary work.
+1. **Does a RAM image run from the boot ROM?** Yes (2026-10-30): felucca-bsp's loader, written to RAM and started
+   by the boot ROM, drew its screen and came up on USB as `1209:0002`.
 2. **The picker:** a menu on the screen, the keys, and a small SysEx exchange with the ESP32 (the list of firmwares,
    the choice). Then the install it already does.
 3. **lilfm1buddy:** a PlatformIO build for a small ESP32-S3 (a Super Mini, battery) with fm1buddy's boot ROM, USB
@@ -67,19 +66,23 @@ git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/picker.bin
 ```
 
-## Test 1: does the picker run from the boot ROM?
+## Use it
 
-On an fm1buddy board (the CYD-S3), which builds on fm1buddy's code (`third_party/fm1buddy`) with its own main
-(`esp32/`). Nothing is written to the FM-1's flash: switching it off and on brings its firmware back.
+On an fm1buddy board (the CYD-S3) for now. It builds on fm1buddy's code (`third_party/fm1buddy`) with its own main
+(`esp32/`).
 
-1. Copy `build/picker.bin` to the SD card as `lilfm1buddy/picker.bin`, and put the card in the board.
-2. `pio run -e cyd-test -t upload` (from a computer), then unplug the board from it.
-3. Plug the board into the FM-1, both on battery, and reset the board. Follow the screen:
+1. Put the firmwares on the SD card in `/fm1/` (`.fwsc`, as fm1buddy keeps them; with fm1buddy's Hub list there
+   too, they get their names from it), and `build/picker.bin` as `lilfm1buddy/picker.bin`.
+2. `pio run -e cyd -t upload` (from a computer), then unplug the board from it.
+3. Plug the board into the FM-1, both on battery, and reset the board:
    - with a running stock V15 or Felucca-based firmware, it sends the FM-1 into its boot ROM by SysEx;
    - otherwise (SLOOP, or no FM-1 found) it restarts into key mode: switch the FM-1 off, then on.
-4. It writes the picker to the FM-1's RAM, jumps to it, and lists the USB devices that come in the next 30 s.
-   Working: the FM-1 says UPDATING, and `1209:0002` (felucca's loader, `ota-FM-1_900`) shows up.
-5. Everything it said is in `fm1buddy/log.txt` on the SD card (the key's details in `fm1buddy/recovery.txt`).
+4. On the FM-1: turn any knob to move, press any button to pick (and again to be sure), or press a piano key to jump
+   to that row. The first row keeps what's on it (the FM-1 restarts, nothing written).
+5. The board installs the one you picked; the FM-1 shows the bar, then restarts into it.
+
+Until a firmware is picked, nothing is written to the FM-1's flash: switching it off and on brings its firmware back.
+On a computer, the board is a serial console: `third_party/fm1buddy/tools/s3.py log` prints what happened.
 
 ## Credits
 

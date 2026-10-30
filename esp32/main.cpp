@@ -246,7 +246,8 @@ static void run(void*) {
   vTaskDelete(0);
 }
 
-// on a computer: its serial port, for tools/s3.py (fm1buddy's) log, cat PATH and ls [PATH]
+// on a computer: its serial port, for tools/s3.py (fm1buddy's) log, cat PATH and ls [PATH]; and "disk": the board
+// restarts as a USB disk (the SD card), until it's reset
 static void console() {
   static char line[160];
   static uint8_t n;
@@ -266,6 +267,8 @@ static void console() {
       board::printFile(line + 4);
     } else if (!strcmp(line, "ls") || !strncmp(line, "ls ", 3)) {
       board::printDir(line[2] ? line + 3 : "");
+    } else if (!strcmp(line, "disk")) {
+      hal::diskModeSet(true);  // (the board restarts)
     }
   }
 }
@@ -277,9 +280,16 @@ void setup() {
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
   say(TFT_WHITE, "lilfm1buddy");
+  if (hal::diskMode()) {  // (fm1buddy's: the SD card is the computer's)
+    say(TFT_WHITE, "USB disk: the SD card is on the computer.");
+    say(TFT_WHITE, "Eject it there, then reset this board.");
+    board::usbBegin();
+    return;
+  }
   if (hal::onComputer()) {
     say(TFT_WHITE, "On a computer: serial console");
     say(TFT_WHITE, "  third_party/fm1buddy/tools/s3.py log");
+    say(TFT_WHITE, "  \"disk\": the SD card as a USB disk");
     return;
   }
   // the serial port off first, in recovery mode: Serial.end() drives D+ and D- low, and the key is on them

@@ -19,36 +19,16 @@ for (const a of document.querySelectorAll('[data-tab]')) {
 }
 tab(location.hash.slice(1) || 'install')
 
-// ---- the firmware next to the page, for the board picked ----
-function pickBoard(name) {
-  $('#install').setAttribute('manifest', `fw/${name}/manifest.json`)
-  fetch(`fw/${name}/manifest.json`)
-    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('none'))))
-    .then((m) => {
-      $('#release').textContent = `Firmware ${m.version}`
-      $('#install').hidden = false
-      $('#nofw').hidden = true
-    })
-    .catch(() => {
-      $('#install').hidden = true
-      $('#nofw').hidden = false
-    })
-  try {
-    localStorage.setItem('board', name)
-  } catch (e) {}
-}
-for (const r of document.querySelectorAll('input[name=board]')) {
-  r.addEventListener('change', () => pickBoard(r.value))
-}
-{
-  let saved = null
-  try {
-    saved = localStorage.getItem('board')
-  } catch (e) {}
-  const r = saved && document.querySelector(`input[name=board][value=${saved}]`)
-  if (r) r.checked = true
-  pickBoard(document.querySelector('input[name=board]:checked').value)
-}
+// ---- the firmware next to the page (the XIAO ESP32S3 Plus's) ----
+fetch($('#install').getAttribute('manifest'))
+  .then((r) => (r.ok ? r.json() : Promise.reject(new Error('none'))))
+  .then((m) => {
+    $('#release').textContent = `Firmware ${m.version}`
+  })
+  .catch(() => {
+    $('#install').hidden = true
+    $('#nofw').hidden = false
+  })
 
 // ---- the board, over serial ----
 class Board {

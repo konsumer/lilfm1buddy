@@ -27,32 +27,20 @@
       <div data-page="install">
         <section class="panel">
           <h2>You need</h2>
-          <p>An ESP32-S3 board (pick yours, the install button follows):</p>
-          <div class="boards">
-            <label class="board"
-              ><input type="radio" name="board" value="xiaoplus" checked /> <strong>Seeed XIAO ESP32S3 Plus</strong> <span class="tag">suggested</span><br />
-              <span class="dim">21 × 18 mm. 16 MB flash: about 20 firmwares. A LiPo charger on board (battery pads on its back), and it reads its battery: the FM-1 shows its level. Its one LED blinks what it's doing.</span></label
-            >
-            <label class="board"
-              ><input type="radio" name="board" value="xiao" /> <strong>Seeed XIAO ESP32S3</strong><br />
-              <span class="dim">The same size, 8 MB flash: about 10 firmwares. A LiPo charger on board, but it can't read its battery.</span></label
-            >
-            <label class="board"
-              ><input type="radio" name="board" value="zero" /> <strong>Waveshare ESP32-S3-Zero</strong><br />
-              <span class="dim">24 × 18 mm. 4 MB flash: 3 or 4 firmwares. No charger: a LiPo and a charger board on its 5V pin (it takes 3.7 to 6 V there). Its RGB LED in colours (it draws a little even while the board sleeps: a power switch helps here).</span></label
-            >
-            <label class="board"
-              ><input type="radio" name="board" value="devkit" /> <strong>Any ESP32-S3 with 16 MB flash and PSRAM</strong> (N16R8, like the ESP32-S3-DevKitC-1)<br />
-              <span class="dim">Bigger. About 20 firmwares. Its RGB LED on GPIO 48. Power it from its other USB port (a power bank), the chip's own USB to the FM-1.</span></label
-            >
-          </div>
           <ul>
-            <li><strong>a battery</strong>: the board is the FM-1's USB host, each on its own battery, one USB-C data cable between them (no hub, no charger in between). A single-cell (1S, 3.7 V) LiPo, 150 to 500 mAh: a few mAh a firmware switch, and the XIAO charges it at about 100 mA from its USB-C (its red charge LED flashes while it does, and goes out when it's full). Small ones made for toy helicopters (like the Syma S107's) do, but often have no protection circuit: take one that says it has, or let the board's sleep (below) look after it. On the XIAO, cut off the plug and solder the leads to the BAT+ and BAT− pads on its back. <strong>Check the polarity with a meter first</strong>: the wires on these packs aren't always where their plug says.</li>
-            <li>no power switch: when it's done (or nothing happens for a while) the board goes to deep sleep, a few tens of µA (months on a small battery). <strong>Press its reset button to wake it</strong> for the next switch.</li>
+            <li>
+              <a href="https://www.aliexpress.us/item/3256808143430495.html"><strong>Seeed XIAO ESP32S3 Plus</strong></a
+              >: 21 × 18 mm, room for about 20 firmwares, a battery charger on board, and it reads its battery (the FM-1 shows its level). Its LED blinks what it's doing.
+            </li>
+            <li>
+              <a href="https://www.aliexpress.us/item/3256802077349750.html"><strong>a 3.7 V 180 mAh LiPo with bare wires</strong></a
+              >: solder it to the BAT+ and BAT− pads on the XIAO's back. <strong>Check the polarity with a meter first</strong>: the wire colours on these aren't always right. A firmware switch takes a few mAh, and the XIAO charges it from its USB-C (its red LED flashes while it does, and goes out when it's full).
+            </li>
             <li>Chrome or Edge on a computer, and a USB-C cable that carries data</li>
           </ul>
+          <p>No power switch: when it's done, or nothing happens for a while, the board goes to deep sleep (months on that battery). <strong>Press its reset button to wake it.</strong></p>
           <h2>1. The program</h2>
-          <p>Plug the board into this computer and press Install. A new board: let it erase. To update one, don't: its firmwares stay.</p>
+          <p>Plug the XIAO into this computer and press Install. A new board: let it erase. To update one, don't: its firmwares stay.</p>
           <esp-web-install-button id="install" manifest="fw/xiaoplus/manifest.json">
             <button slot="activate" class="button">Install lilfm1buddy</button>
             <span slot="unsupported">Your browser can't: use Chrome or Edge on a computer.</span>
@@ -116,49 +104,36 @@
       <div data-page="use" hidden>
         <section class="panel">
           <ol>
-            <li>Both on battery: plug the board into the FM-1 with a USB-C data cable (no hub, no charger), and switch them on.</li>
+            <li>Press the XIAO's reset button to wake it, and plug it into the FM-1 (switched on) with a USB-C data cable: no hub, no charger.</li>
             <li>With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With any other (SLOOP, ...), or none, the LED says <em>switch it off, then on</em>: do.</li>
-            <li>The FM-1 shows the list. Turn any knob to move, press any button to pick, and again to be sure. A piano key jumps to its row. The top of the screen shows both batteries (the FM-1's, and the board's when it can tell).</li>
+            <li>The FM-1 shows the list. Turn any knob to move, press any button to pick, and again to be sure. A piano key jumps to its row. The top of the screen shows both batteries: the FM-1's, and the XIAO's.</li>
             <li>The board writes it, then the FM-1 starts it, and the board goes to sleep. Unplug it.</li>
           </ol>
-          <h2>The LED</h2>
+          <h2>The XIAO's LED</h2>
           <table>
-            <thead>
-              <tr>
-                <th>What it's doing</th>
-                <th>RGB LED</th>
-                <th>XIAO's LED</th>
-              </tr>
-            </thead>
             <tbody>
               <tr>
                 <td>looking for the FM-1</td>
-                <td><span class="dot blue"></span> blue</td>
                 <td>a blip a second</td>
               </tr>
               <tr>
                 <td>switch the FM-1 off, then on</td>
-                <td><span class="dot yellow"></span> yellow</td>
                 <td>a slow blink</td>
               </tr>
               <tr>
                 <td>pick one on the FM-1</td>
-                <td><span class="dot cyan"></span> cyan</td>
                 <td>on, a short gap a second</td>
               </tr>
               <tr>
                 <td>writing it</td>
-                <td><span class="dot magenta"></span> magenta</td>
                 <td>a fast blink</td>
               </tr>
               <tr>
                 <td>done</td>
-                <td><span class="dot green"></span> green</td>
-                <td>on</td>
+                <td>on (then it sleeps)</td>
               </tr>
               <tr>
                 <td>it didn't (the Firmwares tab shows its log)</td>
-                <td><span class="dot red"></span> red</td>
                 <td>three blips, a pause</td>
               </tr>
             </tbody>

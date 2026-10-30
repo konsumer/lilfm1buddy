@@ -11,35 +11,28 @@ Working on hardware (2026-10-30): fomajam and baudgirl installed from the FM-1's
 
 ## You need
 
-One of these ESP32-S3 boards (the web page installs each):
+- a [Seeed XIAO ESP32S3 Plus](https://www.aliexpress.us/item/3256808143430495.html): 21 × 18 mm, room for about 20
+  firmwares, a battery charger on board, and it reads its battery (the FM-1 shows its level)
+- a [3.7 V 180 mAh LiPo with bare wires](https://www.aliexpress.us/item/3256802077349750.html), soldered to the BAT+
+  and BAT− pads on the XIAO's back. Check the polarity with a meter first: the wire colours on these aren't always
+  right. A firmware switch takes a few mAh; the XIAO charges it from its USB-C (its red LED flashes while it does)
 
-| Board | Size | Firmwares | Power | LED |
-| --- | --- | --- | --- | --- |
-| **Seeed XIAO ESP32S3 Plus** (suggested) | 21 × 18 mm | about 20 (16 MB flash) | LiPo charger, BAT pads on its back; reads its battery (the FM-1 shows it) | one colour: blinks |
-| Seeed XIAO ESP32S3 | 21 × 18 mm | about 10 (8 MB flash) | LiPo charger, BAT pads on its back | one colour: blinks |
-| Waveshare ESP32-S3-Zero | 24 × 18 mm | 3 or 4 (4 MB flash) | none: a LiPo and a charger board on its 5V pin (3.7 to 6 V) | RGB on GPIO 21 |
-| any ESP32-S3 N16R8 (DevKitC-1, ...) | bigger | about 20 (16 MB flash) | its other USB port (a power bank) | RGB on GPIO 48 |
+No power switch: when it's done, or nothing happens for a while (two minutes waiting for the FM-1 to be switched on,
+ten for a pick), the board goes to deep sleep, months on that battery. **Its reset button wakes it.**
 
-And a battery: the board is the FM-1's USB host, each on its own battery, one USB-C data cable between them, no
-hub. A single-cell (1S, 3.7 V) LiPo of 150 to 500 mAh does: a switch takes a few mAh, and the XIAO charges at about
-100 mA (its red charge LED flashes while it does). Small packs for toy helicopters (the Syma S107's) work, but often
-have no protection circuit: take one that has, or count on the board's sleep. Cut the plug off, check the polarity
-with a meter (the wires on these packs aren't always where their plug says) and solder it to the XIAO's BAT pads.
-
-No power switch: when it's done, or nothing happens for a while (two minutes waiting for the FM-1 to be switched
-on, ten for a pick), the board goes to deep sleep: tens of µA, months on a small battery. **Its reset
-button wakes it.** (The Zero's RGB LED still draws a little while it sleeps: a switch helps there.)
+The board is the FM-1's USB host: each on its own battery, one USB-C data cable between them, no hub.
 
 ## Use it
 
-1. Plug the board into the FM-1 and switch both on.
+1. Wake the board (its reset button) and plug it into the FM-1, both switched on. Its LED blips once a second while
+   it looks for the FM-1.
 2. With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With
-   any other (SLOOP, ...), or none, the LED goes yellow: switch the FM-1 off, then on.
-3. The FM-1 shows the list (LED cyan), and both batteries at the top (the FM-1's, and the board's on the Plus). Turn
-   any knob to move, press any button to pick (and again to be sure), or a piano key to jump to its row. To keep
-   what's on it, switch the FM-1 off and on.
-4. The board writes it (magenta), and the FM-1 starts it (green). Red: it didn't; the page's Firmwares tab shows the
-   board's log. (The XIAO's one LED blinks instead: the page's "Use it" tab has them.)
+   any other (SLOOP, ...), or none, the LED blinks slowly: switch the FM-1 off, then on.
+3. The FM-1 shows the list, and both batteries at the top (the LED on, with a short gap each second). Turn any knob
+   to move, press any button to pick (and again to be sure), or a piano key to jump to its row. To keep what's on
+   it, switch the FM-1 off and on.
+4. The board writes it (a fast blink), and the FM-1 starts it: the LED on. Three blips and a pause: it didn't (the
+   page's Firmwares tab shows the board's log). Then the board goes to sleep.
 
 Until a firmware is picked, nothing is written. Only the firmware's own image is written (from `0x4000` to its end:
 `0x93000` for most, baudgirl `0xBA000`, stock V16 `0xA9000`), never the flash's head (what the chip starts from), and
@@ -75,11 +68,13 @@ board's program has the picker in it:
 ```sh
 git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/picker.bin
-pio run -e xiaoplus -t upload                        # the board: xiaoplus, xiao, zero or devkit
+pio run -e xiaoplus -t upload                        # the board
 npm run fmt                                          # the web page's formatting
 ```
 
-`pio run -e cyd` is the same on an fm1buddy board (the CYD-S3), with what it's doing on its screen too: handy while
+Other ESP32-S3 boards with PSRAM build too (`platformio.ini`: `xiao`, the XIAO ESP32S3, 8 MB; `zero`, the Waveshare
+ESP32-S3-Zero, 4 MB, RGB LED; `devkit`, any N16R8), with `pio run -e NAME -t upload`. `pio run -e cyd` is the same on
+an fm1buddy board (the CYD-S3), with what it's doing on its screen too: handy while
 working on it. CI (`.github/workflows/build.yml`) builds both, and on `main` puts the page on GitHub Pages with the
 program next to it.
 

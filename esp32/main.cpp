@@ -188,13 +188,7 @@ static void test(void*) {
   }
   say(TFT_GREEN, "Jumped. Watching USB for 30 s:");
   say(TFT_GREEN, "(the FM-1 should say UPDATING)");
-  // the jump's transfer was cut off as the ROM left: TinyUSB never frees that channel, and may not take the next
-  // device (fm1buddy's hal::usbRestart, after a boot ROM job, is for the same)
-  if (!watch(3000)) {
-    say(TFT_YELLOW, "No device yet: restarting the USB host");
-    hal::usbRestart();
-    watch(30000);
-  }
+  watch(30000);
   say(TFT_WHITE, "Done. Switch the FM-1 off and on.");
   vTaskDelete(0);
 }

@@ -1,31 +1,36 @@
-// lilfm1buddy on an fm1buddy board (the CYD-S3), with the FM-1 on its USB port: pick a firmware on the FM-1 itself,
-// from the ones on the SD card (/fm1/*.fwsc, named as fm1buddy names them). What happens is on the board's screen,
-// and in fm1buddy/log.txt on the SD card.
+// lilfm1buddy on an fm1buddy board (the CYD-S3), with the FM-1 on its USB port: pick a firmware on the FM-1 itself.
+// Everything is in the board's own flash (no SD card), from data/ (pio run -t uploadfs): picker.bin, wl82loader.bin
+// and the firmwares, fm1/*.fwsc. What happens is on the board's screen, and in log.txt there (the console's "log").
 //
 //   1. the FM-1 into its boot ROM: SysEx to its firmware (stock V15, Felucca-based ones). If that doesn't work, the
 //      board restarts into fm1buddy's recovery mode, and the key does it as the FM-1 is switched on
-//   2. the picker (lilfm1buddy/picker.bin, picker/build.sh) into its RAM, and a jump to it. Nothing is written to its
+//   2. the picker (picker.bin, picker/build.sh) into its RAM, and a jump to it. Nothing is written to its
 //      flash yet: switching the FM-1 off and on brings its firmware back
 //   3. the picker asks for the list (picker.c says how), shows it, and says which one
 //   4. that one is written to it: the FM-1 back into its boot ROM (the picker takes the SysEx too), JieLi's loader
-//      (fm1buddy/wl82loader.bin, fm1buddy's uboot.cpp), and the sectors of its app area that differ, as fm1buddy's
-//      recovery writes them. The rest of the flash (each firmware's data) stays
+//      (wl82loader.bin), and the sectors of its app area that differ, as fm1buddy's recovery writes them. The rest of
+//      the flash (each firmware's data) stays
 #include <Arduino.h>
+#include <LittleFS.h>
 #include <TFT_eSPI.h>
+#include <dirent.h>
 #include <stdarg.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
 #include "board.h"
-#include "catalog.h"
 #include "fm1.h"
 #include "hal.h"
 #include "midi.h"
 #include "rom.h"
-#include "uboot.h"
 
-#define PICKER "/sdcard/lilfm1buddy/picker.bin"
+#define FS "/fs"  // the board's flash (LittleFS)
+#define PICKER FS "/picker.bin"
+#define LOADER FS "/wl82loader.bin"
+#define FW_DIR FS "/fm1"
+#define LOG FS "/log.txt"
 #define PICKER_VID 0x1209
 #define PICKER_PID 0x0002
 #define LIST_MAX 24  // picker.c's PK_MAX
@@ -33,8 +38,13 @@
 #define LINE_H 16
 #define APP_END 0x93000u  // the app area is [WRITE_FROM, APP_END): an update loader writes no more
 
+struct Firmware {
+  std::string file, name;  // "fomajam-0.1.7.fwsc", "fomajam-0.1.7"
+};
+
 static TFT_eSPI tft;
 static int line;
+static bool fsOk;
 
 // a line on the screen, and in the log
 static void say(uint16_t color, const char* fmt, ...) __attribute__((format(printf, 2, 3)));
@@ -45,6 +55,12 @@ static void say(uint16_t color, const char* fmt, ...) {
   vsnprintf(s, sizeof s, fmt, a);
   va_end(a);
   hal::log("lil: %s", s);
+  if (fsOk && !hal::onComputer()) {
+    if (FILE* f = fopen(LOG, "a")) {
+      fprintf(f, "%7.1f %s\n", millis() / 1000.0, s);
+      fclose(f);
+    }
+  }
   if (line + LINE_H > tft.height()) {
     tft.fillScreen(TFT_BLACK);
     line = 0;
@@ -59,24 +75,34 @@ static void fail(const char* e) {
   say(TFT_WHITE, "Done. Reset this board to try again.");
 }
 
-static bool loadPicker(std::vector<uint8_t>& out) {
-  FILE* f = fopen(PICKER, "rb");
+// a file from the board's flash, max bytes at most
+static bool load(const char* path, std::vector<uint8_t>& out, uint32_t max) {
+  FILE* f = fopen(path, "rb");
   if (!f) {
     return false;
   }
-  out.resize(PICKER_MAX + 1);
+  out.resize(max + 1);
   size_t n = fread(out.data(), 1, out.size(), f);
   fclose(f);
   out.resize(n);
-  return n > 0 && n <= PICKER_MAX;
+  return n > 0 && n <= max;
 }
 
-// the firmwares on the SD card, as fm1buddy lists them
+// the firmwares in the board's flash, by name
 static std::vector<Firmware> firmwares() {
-  std::string err;
-  catalog::parseHub(catalog::hub, catalog::hubUpdated, err);  // (names from the Hub's list, if it's there)
-  catalog::scanSd();
-  std::vector<Firmware> l = catalog::sd;
+  std::vector<Firmware> l;
+  if (DIR* d = opendir(FW_DIR)) {
+    while (dirent* e = readdir(d)) {
+      std::string f = e->d_name;
+      if (f[0] != '.' && f.size() > 5 && !strcasecmp(f.c_str() + f.size() - 5, ".fwsc")) {
+        l.push_back({f, f.substr(0, f.size() - 5)});
+      }
+    }
+    closedir(d);
+  }
+  std::sort(l.begin(), l.end(), [](const Firmware& a, const Firmware& b) {
+    return strcasecmp(a.name.c_str(), b.name.c_str()) < 0;
+  });
   if (l.size() > LIST_MAX) {
     l.resize(LIST_MAX);
   }
@@ -85,12 +111,8 @@ static std::vector<Firmware> firmwares() {
 
 // its name for the FM-1's screen: 7-bit, NAME_MAX at most
 static std::string shortName(const Firmware& f) {
-  std::string n = f.name.empty() ? f.file : f.name + (f.version.empty() ? "" : " " + f.version);
-  if (f.name.empty() && n.size() > 5 && n.compare(n.size() - 5, 5, ".fwsc") == 0) {
-    n.resize(n.size() - 5);
-  }
   std::string out;
-  for (char c : n) {
+  for (char c : f.name) {
     if (out.size() < NAME_MAX) {
       out += c >= 0x20 && c < 0x7F ? c : '?';
     }
@@ -202,10 +224,10 @@ static void reading(uint32_t done, uint32_t total) {
   }
 }
 
-// firmware f onto the FM-1 (device d, the picker): 0, or an error
-static const char* install(int d, const Firmware& f) {
+// firmware f onto the FM-1 (device d, the picker), with JieLi's loader: 0, or an error
+static const char* install(int d, const Firmware& f, const std::vector<uint8_t>& loader) {
   static Pkg pkg;
-  const char* e = pkg.open(catalog::path(FW_DIR "/" + f.file).c_str());
+  const char* e = pkg.open((FW_DIR "/" + f.file).c_str());
   uint32_t at, n;
   if (e) {
     return e;
@@ -218,9 +240,9 @@ static const char* install(int d, const Firmware& f) {
   }
   const uint8_t* want = pkg.image + at;
   uint32_t end = n < APP_END ? n : APP_END;
-  uboot::Chip chip;
+  rom::Chip chip;
   say(TFT_WHITE, "To its boot ROM, and JieLi's loader");
-  if ((e = uboot::enter(d, chip))) {
+  if ((e = rom::enter(d)) || (e = rom::attach(10000)) || (e = rom::loader(loader.data(), loader.size(), chip))) {
     return e;
   }
   std::vector<uint8_t> now;
@@ -228,7 +250,7 @@ static const char* install(int d, const Firmware& f) {
     e = "That isn't the FM-1's chip: nothing was written.";
   } else {
     say(TFT_WHITE, "Reading its flash");
-    e = uboot::read(chip, now, reading);
+    e = rom::read(chip, now, reading);
   }
   std::vector<uint32_t> sectors;
   for (uint32_t a = WRITE_FROM; !e && a < end; a += SECTOR) {
@@ -245,7 +267,7 @@ static const char* install(int d, const Firmware& f) {
     memcpy(sec, &now[a], SECTOR);  // (the end of a short image: as it is)
     memcpy(sec, want + a, std::min<uint32_t>(SECTOR, end - a));
     for (int t = 0; t < 3; t++) {
-      if (!(e = uboot::writeSector(a, sec))) {
+      if (!(e = rom::writeSector(a, sec))) {
         break;
       }
       hal::log("lil: sector %06X: %s", (unsigned)a, e);
@@ -254,7 +276,7 @@ static const char* install(int d, const Firmware& f) {
       say(TFT_CYAN, "  %u of %u", (unsigned)(k + 1), (unsigned)sectors.size());
     }
   }
-  uboot::leave();  // (it restarts: into the new firmware)
+  rom::leave();  // (it restarts: into the new firmware)
   if (e && !sectors.empty()) {
     static std::string err;
     err = std::string(e) + " Reset this board to try again before switching the FM-1 off.";
@@ -264,15 +286,18 @@ static const char* install(int d, const Firmware& f) {
 }
 
 static void run(void*) {
-  std::vector<uint8_t> picker;
+  std::vector<uint8_t> picker, loader;
   std::vector<Firmware> list;
   const char* e = 0;
-  if (!hal::sd()) {
-    e = "No SD card.";
-  } else if (!loadPicker(picker)) {
-    e = "No " PICKER " (or too big).";
+  char sha[65];
+  if (!fsOk) {
+    e = "No files: pio run -t uploadfs";
+  } else if (!load(PICKER, picker, PICKER_MAX)) {
+    e = "No picker.bin (or too big).";
+  } else if (!hal::sha256(LOADER, sha) || strcmp(sha, LOADER_SHA256) || !load(LOADER, loader, LOADER_SIZE)) {
+    e = "No wl82loader.bin (or not JieLi's).";
   } else if ((list = firmwares()).empty()) {
-    e = "No firmwares in /fm1 on the SD card.";
+    e = "No firmwares (fm1/*.fwsc).";
   }
   if (e || (e = toRom())) {
     if (e) {
@@ -297,7 +322,7 @@ static void run(void*) {
     return vTaskDelete(0);
   }
   say(TFT_GREEN, "Installing %s", list[i].file.c_str());
-  if ((e = install(d, list[i]))) {
+  if ((e = install(d, list[i], loader))) {
     fail(e);
   } else {
     say(TFT_GREEN, "Installed. Unplug this board.");
@@ -305,8 +330,8 @@ static void run(void*) {
   vTaskDelete(0);
 }
 
-// on a computer: its serial port, for tools/s3.py (fm1buddy's) log, cat PATH and ls [PATH]; and "disk": the board
-// restarts as a USB disk (the SD card), until it's reset
+// on a computer: its serial port, for tools/s3.py (fm1buddy's) "log": this board's log (and fm1buddy's, on an SD
+// card if there is one)
 static void console() {
   static char line[160];
   static uint8_t n;
@@ -322,12 +347,14 @@ static void console() {
     n = 0;
     if (!strcmp(line, "log")) {
       board::printLog();
-    } else if (!strncmp(line, "cat ", 4)) {
-      board::printFile(line + 4);
-    } else if (!strcmp(line, "ls") || !strncmp(line, "ls ", 3)) {
-      board::printDir(line[2] ? line + 3 : "");
-    } else if (!strcmp(line, "disk")) {
-      hal::diskModeSet(true);  // (the board restarts)
+      if (FILE* f = fopen(LOG, "r")) {
+        Serial.println("--- log.txt (lilfm1buddy)");
+        char l[200];
+        while (fgets(l, sizeof l, f)) {
+          Serial.print(l);
+        }
+        fclose(f);
+      }
     }
   }
 }
@@ -335,20 +362,17 @@ static void console() {
 void setup() {
   Serial.begin(115200);
   board::begin();
+  fsOk = LittleFS.begin(false, FS);
+  if (fsOk && !hal::onComputer() && !hal::recoveryMode()) {
+    remove(LOG);  // (a new log for each try; key mode's restart goes on with it)
+  }
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
   say(TFT_WHITE, "lilfm1buddy");
-  if (hal::diskMode()) {  // (fm1buddy's: the SD card is the computer's)
-    say(TFT_WHITE, "USB disk: the SD card is on the computer.");
-    say(TFT_WHITE, "Eject it there, then reset this board.");
-    board::usbBegin();
-    return;
-  }
   if (hal::onComputer()) {
     say(TFT_WHITE, "On a computer: serial console");
     say(TFT_WHITE, "  third_party/fm1buddy/tools/s3.py log");
-    say(TFT_WHITE, "  \"disk\": the SD card as a USB disk");
     return;
   }
   // the serial port off first, in recovery mode: Serial.end() drives D+ and D- low, and the key is on them

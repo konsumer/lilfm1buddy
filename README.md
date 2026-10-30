@@ -67,6 +67,20 @@ git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/picker.bin
 ```
 
+## Test 1: does the picker run from the boot ROM?
+
+On an fm1buddy board (the CYD-S3), which builds on fm1buddy's code (`third_party/fm1buddy`) with its own main
+(`esp32/`). Nothing is written to the FM-1's flash: switching it off and on brings its firmware back.
+
+1. Copy `build/picker.bin` to the SD card as `lilfm1buddy/picker.bin`, and put the card in the board.
+2. `pio run -e cyd-test -t upload` (from a computer), then unplug the board from it.
+3. Plug the board into the FM-1, both on battery, and reset the board. Follow the screen:
+   - with a running stock V15 or Felucca-based firmware, it sends the FM-1 into its boot ROM by SysEx;
+   - otherwise (SLOOP, or no FM-1 found) it restarts into key mode: switch the FM-1 off, then on.
+4. It writes the picker to the FM-1's RAM, jumps to it, and lists the USB devices that come in the next 30 s.
+   Working: the FM-1 says UPDATING, and `1209:0002` (felucca's loader, `ota-FM-1_900`) shows up.
+5. Everything it said is in `fm1buddy/log.txt` on the SD card (the key's details in `fm1buddy/recovery.txt`).
+
 ## Credits
 
 - [felucca-bsp](https://github.com/hugelton/felucca-bsp) (Leo Kuroshita, Charles Vestal, and others; MPL-2.0): the

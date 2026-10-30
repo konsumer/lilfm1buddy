@@ -7,7 +7,9 @@
 //   2. the picker (lilfm1buddy/picker.bin, picker/build.sh) into its RAM, and a jump to it. Nothing is written to its
 //      flash yet: switching the FM-1 off and on brings its firmware back
 //   3. the picker asks for the list (picker.c says how), shows it, and says which one
-//   4. that one is installed to it, as fm1buddy installs (fm1::install: the picker is an update loader)
+//   4. that one is written to it: the FM-1 back into its boot ROM (the picker takes the SysEx too), JieLi's loader
+//      (fm1buddy/wl82loader.bin, fm1buddy's uboot.cpp), and the sectors of its app area that differ, as fm1buddy's
+//      recovery writes them. The rest of the flash (each firmware's data) stays
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <stdarg.h>
@@ -21,6 +23,7 @@
 #include "hal.h"
 #include "midi.h"
 #include "rom.h"
+#include "uboot.h"
 
 #define PICKER "/sdcard/lilfm1buddy/picker.bin"
 #define PICKER_VID 0x1209
@@ -28,6 +31,7 @@
 #define LIST_MAX 24  // picker.c's PK_MAX
 #define NAME_MAX 20  // and PK_NAME
 #define LINE_H 16
+#define APP_END 0x93000u  // the app area is [WRITE_FROM, APP_END): an update loader writes no more
 
 static TFT_eSPI tft;
 static int line;
@@ -187,19 +191,76 @@ static int listen(int d, const std::vector<Firmware>& list) {
   }
 }
 
-static void progress(Fm1Step step, uint32_t bytes, uint32_t) {
-  static Fm1Step last = STEP_DONE;
+static void reading(uint32_t done, uint32_t total) {
   static uint32_t shown;
-  static const char* NAMES[] = {"starting", "checking", "the loader", "writing", "restarting", "done"};
-  if (step != last) {
-    say(TFT_CYAN, "install: %s", NAMES[step]);
-    last = step;
+  if (done < shown) {
     shown = 0;
   }
-  if (bytes >= shown + 128 * 1024) {
-    say(TFT_CYAN, "  %u KB", (unsigned)(bytes / 1024));
-    shown = bytes;
+  if (done >= shown + 256 * 1024 || done == total) {
+    say(TFT_CYAN, "  read %u of %u KB", (unsigned)(done / 1024), (unsigned)(total / 1024));
+    shown = done;
   }
+}
+
+// firmware f onto the FM-1 (device d, the picker): 0, or an error
+static const char* install(int d, const Firmware& f) {
+  static Pkg pkg;
+  const char* e = pkg.open(catalog::path(FW_DIR "/" + f.file).c_str());
+  uint32_t at, n;
+  if (e) {
+    return e;
+  }
+  if (!pkg.flash(at, n) || strncmp(pkg.product, "FM-1_", 5)) {
+    return "That package has no FM-1 flash image in it.";
+  }
+  if (n <= WRITE_FROM || n > WRITE_TO) {
+    return "Its flash image is a size the FM-1's isn't.";
+  }
+  const uint8_t* want = pkg.image + at;
+  uint32_t end = n < APP_END ? n : APP_END;
+  uboot::Chip chip;
+  say(TFT_WHITE, "To its boot ROM, and JieLi's loader");
+  if ((e = uboot::enter(d, chip))) {
+    return e;
+  }
+  std::vector<uint8_t> now;
+  if (chip.key != FM1_KEY || chip.flashId != FM1_FLASH || chip.size < WRITE_TO) {
+    e = "That isn't the FM-1's chip: nothing was written.";
+  } else {
+    say(TFT_WHITE, "Reading its flash");
+    e = uboot::read(chip, now, reading);
+  }
+  std::vector<uint32_t> sectors;
+  for (uint32_t a = WRITE_FROM; !e && a < end; a += SECTOR) {
+    if (memcmp(want + a, &now[a], std::min<uint32_t>(SECTOR, end - a))) {
+      sectors.push_back(a);
+    }
+  }
+  if (!e) {
+    say(TFT_WHITE, "Writing %u sectors", (unsigned)sectors.size());
+  }
+  uint8_t sec[SECTOR];
+  for (size_t k = 0; !e && k < sectors.size(); k++) {
+    uint32_t a = sectors[k];
+    memcpy(sec, &now[a], SECTOR);  // (the end of a short image: as it is)
+    memcpy(sec, want + a, std::min<uint32_t>(SECTOR, end - a));
+    for (int t = 0; t < 3; t++) {
+      if (!(e = uboot::writeSector(a, sec))) {
+        break;
+      }
+      hal::log("lil: sector %06X: %s", (unsigned)a, e);
+    }
+    if ((k + 1) % 16 == 0 || k + 1 == sectors.size()) {
+      say(TFT_CYAN, "  %u of %u", (unsigned)(k + 1), (unsigned)sectors.size());
+    }
+  }
+  uboot::leave();  // (it restarts: into the new firmware)
+  if (e && !sectors.empty()) {
+    static std::string err;
+    err = std::string(e) + " Reset this board to try again before switching the FM-1 off.";
+    return err.c_str();
+  }
+  return e;
 }
 
 static void run(void*) {
@@ -236,12 +297,7 @@ static void run(void*) {
     return vTaskDelete(0);
   }
   say(TFT_GREEN, "Installing %s", list[i].file.c_str());
-  Pkg pkg;
-  e = pkg.open(catalog::path(FW_DIR "/" + list[i].file).c_str());
-  if (!e) {
-    e = fm1::install(pkg, progress);
-  }
-  if (e) {
+  if ((e = install(d, list[i]))) {
     fail(e);
   } else {
     say(TFT_GREEN, "Installed. Unplug this board.");

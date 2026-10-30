@@ -8,11 +8,13 @@
  *
  *   picker -> ESP32  F0 7D 4C 42 10 F7          hello: send the list (once a second until it has all of it)
  *   ESP32 -> picker  F0 7D 4C 42 01 i n NAME F7  firmware i of n (NAME: ASCII, 7-bit)
- *   picker -> ESP32  F0 7D 4C 42 12 i F7        install firmware i (once a second until the install starts)
+ *   picker -> ESP32  F0 7D 4C 42 12 i F7        install firmware i (once a second, until the ESP32 sends the boot
+ *                                               ROM's key: F0 22 24 35 7D F7)
  *
- * Then the ESP32 installs it over M-UPGRADE, as to any loader (fm1buddy's fm1::install), and ldr_core.c writes the
- * app area. "Keep" restarts the FM-1 with nothing written. Any knob moves, any button picks (and again to be sure),
- * a piano key jumps to its row. Runs from RAM with interrupts off: USB is polled. Single compilation unit. */
+ * Then the ESP32 writes it through the boot ROM and JieLi's loader, as fm1buddy's recovery does: the flash driver
+ * here (fm1_flash.h) wants the flash as the SPL leaves it, and the boot ROM doesn't. "Keep" restarts the FM-1 with
+ * nothing written. Any knob moves, any button picks (and again to be sure), a piano key jumps to its row. Runs from
+ * RAM with interrupts off: USB is polled. Single compilation unit. */
 #include <stdint.h>
 #define FELUCCA_LOADER 1
 #define FELUCCA_CDC 0
@@ -78,26 +80,8 @@ static void ota_show(uint32_t step, int32_t code)
 static void ota_commit(const uint8_t *parm) { (void)parm; }
 #include "ota.c"
 
-/* ---- ldr_core.c hooks ---- */
-static int ldr_fread(uint32_t off, void *p, uint32_t n) { return fl_read_ram(off, p, n); }
-static int ldr_erase(uint32_t off)
-{
-  uint32_t took;
-  return fl_erase4k_ram(off, &took);
-}
-static int ldr_prog(uint32_t off, const void *p, uint32_t n)
-{
-  uint32_t took;
-  return fl_prog_ram(off, p, n, &took);
-}
 static void ldr_record_clear(void) { fm1_updata_parm_clear(); }
 #include "screen.c"
-static void ldr_progress(uint32_t done, uint32_t total)
-{
-  scr_progress(done, total);
-  ldr_poll();
-}
-#include "ldr_core.c"
 
 /* ---- the menu ---- */
 #define PK_MAX 24u   /* firmwares */
@@ -216,34 +200,7 @@ static void pk_keep(void) /* the FM-1 starts what's in its flash */
   fm1_core_reset();
 }
 
-static void pk_install(void)
-{
-  int rc;
-  pk_screen("INSTALLING", pk_names[pk_sel], "DO NOT UNPLUG");
-  scr_bar_start();
-  rc = ldr_session();
-  if (rc == 0) {
-    fm1_delay_ms(200); /* the "success" reply leaves */
-    usb_detach();
-    fm1_delay_ms(30);
-    fm1_core_reset(); /* the SPL boots the new app */
-  }
-  /* (a bad package is refused before anything is erased; cut off while writing, the FM-1 is left with half a
-   * firmware: install again before switching it off) */
-  {
-    char why[24] = "BEFORE SWITCHING IT OFF", code[12] = "ERROR -", *c = code + 7;
-    uint32_t v = (uint32_t)-rc, d = 1;
-    while (v / d >= 10u)
-      d *= 10u;
-    for (; d; d /= 10u)
-      *c++ = (char)('0' + v / d % 10u);
-    *c = 0;
-    pk_screen("IT DIDN'T INSTALL", "INSTALL AGAIN", why);
-    scr_center(160, code, 2, SCR_FG); /* ldr_core.c's: -3 its size, -5 a read, -6 another chip key, -4x this key */
-  }
-}
-
-enum { PK_WAIT, PK_MENU, PK_SURE, PK_ASKED, PK_FAILED };
+enum { PK_WAIT, PK_MENU, PK_SURE, PK_ASKED };
 
 static void pk_main(void)
 {
@@ -272,13 +229,7 @@ static void pk_main(void)
       ota_frame_done();
     }
     ota_service(); /* handshake: who it is */
-    if (usb.ota_req) {
-      usb.ota_req = 0;
-      if (state == PK_ASKED) {
-        pk_install();
-        state = PK_FAILED;
-      }
-    }
+    usb.ota_req = 0; /* (M-UPGRADE: not here) */
     if (state == PK_WAIT && pk_complete()) {
       state = PK_MENU;
       pk_menu();
@@ -314,17 +265,11 @@ static void pk_main(void)
       if (button) {
         state = PK_ASKED;
         said = 0;
-        pk_screen("INSTALL", pk_names[pk_sel], "WAITING FOR THE ESP32");
+        pk_screen("INSTALLING", pk_names[pk_sel], "DO NOT UNPLUG");
       } else if (steps || key >= 0) {
         state = PK_MENU;
         pk_menu();
       }
-    } else if (state == PK_ASKED && (steps || key >= 0)) {
-      state = PK_MENU;
-      pk_menu();
-    } else if (state == PK_FAILED && button) {
-      state = PK_MENU;
-      pk_menu();
     }
   }
 }

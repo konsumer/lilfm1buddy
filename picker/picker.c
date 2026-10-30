@@ -230,8 +230,17 @@ static void pk_install(void)
   }
   /* (a bad package is refused before anything is erased; cut off while writing, the FM-1 is left with half a
    * firmware: install again before switching it off) */
-  pk_screen("IT DIDN'T INSTALL", "INSTALL AGAIN", "BEFORE SWITCHING IT OFF");
-  (void)rc;
+  {
+    char why[24] = "BEFORE SWITCHING IT OFF", code[12] = "ERROR -", *c = code + 7;
+    uint32_t v = (uint32_t)-rc, d = 1;
+    while (v / d >= 10u)
+      d *= 10u;
+    for (; d; d /= 10u)
+      *c++ = (char)('0' + v / d % 10u);
+    *c = 0;
+    pk_screen("IT DIDN'T INSTALL", "INSTALL AGAIN", why);
+    scr_center(160, code, 2, SCR_FG); /* ldr_core.c's: -3 its size, -5 a read, -6 another chip key, -4x this key */
+  }
 }
 
 enum { PK_WAIT, PK_MENU, PK_SURE, PK_ASKED, PK_FAILED };

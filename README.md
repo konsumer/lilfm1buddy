@@ -90,6 +90,11 @@ pio run -e xiaoplus -t upload                        # the board
 npm run fmt                                          # the web page's formatting
 ```
 
+`tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`
+(mounts its drive, prints where), `eject` (its serial port), `info`, `ls`, `log`, and `flash ENV` (installs the
+program, then it's the drive again). Run it with PlatformIO's Python, which has pyserial:
+`~/.platformio/penv/bin/python tools/lil.py flash zero`.
+
 Other ESP32-S3 boards with PSRAM build too (`platformio.ini`: `xiao`, the XIAO ESP32S3, 8 MB; `zero`, the Waveshare
 ESP32-S3-Zero, 4 MB, RGB LED; `devkit`, any N16R8), with `pio run -e NAME -t upload`. The drive is the flash past the
 program: about 3 MB on a 4 MB board (5 firmwares, or 3 backups), 7 MB on 8 MB, 15 MB on 16 MB. CI

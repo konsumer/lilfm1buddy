@@ -9,7 +9,8 @@
 //                   MIDI too, "bluetooth NAME" connects to a Bluetooth MIDI device of that name as well
 //   log.txt         what happened last time on the FM-1
 //
-// Ejected, it's the computer's serial port until it's unplugged (for installing this program, and its log). Unplugged,
+// Ejected, it's the computer's serial port until it's unplugged (for installing this program, and its console: below,
+// and tools/lil.py, to drive it from a script). Unplugged,
 // it restarts (for the FM-1). Installing it any time: the chip's own download mode (hold BOOT, tap reset), which
 // nothing here can break.
 //
@@ -477,6 +478,7 @@ void setup() {
   serialFlag = 0;
   if (serial) {
     led(LED_SERIAL);
+    fsOk = disk::mount();  // (the computer hasn't it now)
     say("lilfm1buddy " VERSION ", on a computer: its serial port, until it's unplugged.");
     return;
   }
@@ -501,9 +503,71 @@ void setup() {
   xTaskCreatePinnedToCore(host, "lil", 16384, 0, 1, 0, 1);
 }
 
+// the serial port's commands, a line each. Each answer ends with a line "OK" or "ERR why" (the log's lines may come
+// between):
+//
+//   info   lilfm1buddy VERSION free=BYTES loader=0|1
+//   ls     NAME BYTES, a line for each file on the drive
+//   log    log.txt (what happened last time on the FM-1)
+//   disk   OK, then it restarts as the USB drive
+static void console() {
+  static char line[80];
+  static uint8_t n;
+  while (Serial.available() > 0) {
+    char c = Serial.read();
+    if (c != '\n' && c != '\r') {
+      if (n < sizeof line - 1) {
+        line[n++] = c;
+      }
+      continue;
+    }
+    line[n] = 0;
+    n = 0;
+    if (!line[0]) {
+      continue;
+    }
+    if (!fsOk && strcmp(line, "disk")) {
+      Serial.println("ERR Its drive didn't mount.");
+    } else if (!strcmp(line, "info")) {
+      char sha[65];
+      bool loader = hal::sha256(LOADER, sha) && !strcmp(sha, LOADER_SHA256);
+      Serial.printf("lilfm1buddy " VERSION " free=%llu loader=%d\nOK\n", disk::freeBytes(), loader);
+    } else if (!strcmp(line, "ls")) {
+      if (DIR* d = opendir(FS)) {
+        while (dirent* e = readdir(d)) {
+          struct stat st;
+          std::string p = FS "/" + std::string(e->d_name);
+          if (!stat(p.c_str(), &st) && S_ISREG(st.st_mode)) {
+            Serial.printf("%s %u\n", e->d_name, (unsigned)st.st_size);
+          }
+        }
+        closedir(d);
+      }
+      Serial.println("OK");
+    } else if (!strcmp(line, "log")) {
+      if (FILE* f = fopen(LOG_FILE, "r")) {
+        char b[256];
+        for (size_t k; (k = fread(b, 1, sizeof b, f));) {
+          Serial.write((uint8_t*)b, k);
+        }
+        fclose(f);
+      }
+      Serial.println("OK");
+    } else if (!strcmp(line, "disk")) {
+      Serial.println("OK");
+      Serial.flush();
+      delay(100);
+      esp_restart();  // (a computer on it: the drive)
+    } else {
+      Serial.printf("ERR What's \"%s\"? (info, ls, log, disk)\n", line);
+    }
+  }
+}
+
 void loop() {
   static uint32_t seen = millis();
   if (serial) {
+    console();
     if (HWCDC::isPlugged()) {
       seen = millis();
     } else if (millis() - seen > 1000) {

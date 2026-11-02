@@ -319,6 +319,7 @@ static void pk_main(void)
     if (ota_frame_get(&p, &n) && n >= 4u && p[0] == 0x7D && p[1] == 0x4C && p[2] == 0x42 && p[3] >= 0x20u) {
       pk_line(p + 3, n - 3u);
       ota_frame_done();
+      said = now; /* (it's answering: asked again only once it's quiet for a second) */
     }
     ota_service(); /* handshake: who it is */
     usb.ota_req = 0; /* (M-UPGRADE: not here) */

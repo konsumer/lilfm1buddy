@@ -41,7 +41,7 @@ and macOS is told not to make most of them. On the drive:
 - `theme.txt`: the menus' colors, one of [fomajam](https://github.com/konsumer/fomajam)'s themes by name: `BLACK` (the
   default), `GREY`, `BLUE`, `GREEN`, `FOREST`, `PURPLE`, `RED`, `ORANGE`, `TEAL`, `WHITE` or `NEON`
 - `midimap.txt`: MIDI routing on the FM-1, with [fm1buddy](https://github.com/konsumer/fm1buddy)'s rules (none: no
-  routing). A line `bluetooth` turns on Bluetooth MIDI (phones and computers connect to it, as `fm1buddy`), and
+  routing): make one on [fm1buddy's MIDI map page](https://konsumer.js.org/fm1buddy/#midimap). A line `bluetooth` turns on Bluetooth MIDI (phones and computers connect to it, as `fm1buddy`), and
   `bluetooth NAME` connects to a Bluetooth MIDI device whose name has NAME in it
 - `log.txt`: what happened last time on the FM-1
 

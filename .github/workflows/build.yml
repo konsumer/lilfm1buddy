@@ -38,16 +38,8 @@ jobs:
           python-version: '3.12'
       - run: pip install platformio
       - run: pio run -e xiaoplus -e xiao -e zero -e devkit
-      - name: the page, with the program
-        run: |
-          version="$(git describe --tags --always)"
-          mkdir -p site/fw && cp build/lilfm1.bin build/lilsmk.bin site/fw/  # (the menus, for the page to put on a drive)
-          for b in xiaoplus xiao zero devkit; do
-            mkdir -p site/fw/$b
-            cp .pio/build/$b/firmware.factory.bin site/fw/$b/lilfm1buddy.bin
-            jq -n --arg v "$version" '{name: "lilfm1buddy", version: $v, new_install_prompt_erase: true,
-              builds: [{chipFamily: "ESP32-S3", parts: [{path: "lilfm1buddy.bin", offset: 0}]}]}' > site/fw/$b/manifest.json
-          done
+      - name: the page, with the program and the menus
+        run: tools/site.sh
       - uses: actions/upload-artifact@v4
         with:
           name: firmware

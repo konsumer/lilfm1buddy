@@ -43,7 +43,15 @@
           </ul>
           <p>No power switch: when it's done, or nothing happens for a while, the board goes to deep sleep (months on that battery). <strong>Press its BOOT button (or reset) to wake it.</strong></p>
           <h2>1. The program</h2>
-          <p>Plug the XIAO into this computer. A new board: hold its BOOT button, tap reset, and let go (its download mode). One with lilfm1buddy on it: eject its drive (its LED goes blue). Then press Install. A new board, or one with lilfm1buddy 0.1 on it: let it erase (its files go: it keeps them on a USB drive now). To update one, don't: its files stay. Then tap reset.</p>
+          <p>Pick your board, and plug it into this computer. A new board: hold its BOOT button, tap reset, and let go (its download mode). One with lilfm1buddy on it: eject its drive (its LED goes blue). Then press Install. A new board, or one with lilfm1buddy 0.1 on it: let it erase (its files go: it keeps them on a USB drive now). To update one, don't: its files stay. Then tap reset.</p>
+          <p class="row">
+            <select id="boardtype" aria-label="your board">
+              <option value="xiaoplus">Seeed XIAO ESP32S3 Plus</option>
+              <option value="xiao">Seeed XIAO ESP32S3</option>
+              <option value="zero">Waveshare ESP32-S3-Zero</option>
+              <option value="devkit">ESP32-S3 DevKit (N16R8)</option>
+            </select>
+          </p>
           <esp-web-install-button id="install" manifest="fw/xiaoplus/manifest.json">
             <button slot="activate" class="button">Install lilfm1buddy</button>
             <span slot="unsupported">Your browser can't: use Chrome or Edge on a computer.</span>

@@ -102,6 +102,7 @@ git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/lilfm1.bin, build/lilsmk.bin
 pio run -e xiaoplus -t upload                        # the board
 npm run fmt                                          # the web page's formatting
+npm run serve                                        # the web page at localhost:8000, with what's built
 ```
 
 `tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`

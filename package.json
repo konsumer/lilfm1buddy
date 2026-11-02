@@ -2,6 +2,7 @@
   "name": "lilfm1buddy",
   "private": true,
   "scripts": {
-    "fmt": "npx -y prettier -w site"
+    "fmt": "npx -y prettier -w site",
+    "serve": "tools/site.sh && python3 -m http.server -b 127.0.0.1 -d site 8000"
   }
 }

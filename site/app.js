@@ -21,16 +21,31 @@ for (const a of document.querySelectorAll('[data-tab]')) {
 }
 tab(location.hash.slice(1) || 'install')
 
-// ---- the firmware next to the page (the XIAO ESP32S3 Plus's) ----
-fetch($('#install').getAttribute('manifest'))
-  .then((r) => (r.ok ? r.json() : Promise.reject(new Error('none'))))
-  .then((m) => {
-    $('#release').textContent = `Firmware ${m.version}`
-  })
-  .catch(() => {
-    $('#install').hidden = true
-    $('#nofw').hidden = false
-  })
+// ---- the program next to the page, for the board picked (remembered) ----
+function board(name) {
+  $('#boardtype').value = name
+  $('#install').setAttribute('manifest', `fw/${name}/manifest.json`)
+  try {
+    localStorage.board = name
+  } catch (e) {}
+  fetch(`fw/${name}/manifest.json`)
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('none'))))
+    .then((m) => {
+      $('#release').textContent = `Firmware ${m.version}`
+      $('#install').hidden = false
+      $('#nofw').hidden = true
+    })
+    .catch(() => {
+      $('#install').hidden = true
+      $('#nofw').hidden = false
+    })
+}
+$('#boardtype').addEventListener('change', () => board($('#boardtype').value))
+let saved = 'xiaoplus'
+try {
+  saved = localStorage.board || saved
+} catch (e) {}
+board(saved)
 
 // ---- the drive ----
 let drive = null

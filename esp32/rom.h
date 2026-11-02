@@ -9,7 +9,7 @@
 
 #define ROM_VID 0x4C4A
 #define ROM_PID 0x8057
-#define PICKER_AT 0x01C0A800u  // felucca-bsp's loader.ld
+#define PICKER_AT 0x01C0A800u  // the menus', fomajam's platform/loader/loader.ld
 #define PICKER_MAX 0x14000u
 #define LOADER_AT 0x01C02000u  // JieLi's wl82loader.bin
 #define LOADER_SIZE 24064u
@@ -28,7 +28,7 @@ struct Chip {
   uint32_t io;       // the most a read moves at once
 };
 
-// a running FM-1 (MIDI device d) into its boot ROM, by SysEx (stock V15, Felucca-based firmwares, the picker); 0 or
+// a running FM-1 (MIDI device d) into its boot ROM, by SysEx (stock V15, Felucca-based firmwares, the menu); 0 or
 // an error
 const char* enter(int d);
 // the boot ROM there and answering, within ms (after enter, or the key); 0 or an error

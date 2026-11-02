@@ -22,7 +22,7 @@
 
     <nav class="tabs wrap" aria-label="pages">
       <a href="#" data-tab="install">Install</a>
-      <a href="#firmwares" data-tab="firmwares">Firmwares</a>
+      <a href="#drive" data-tab="drive">Drive</a>
       <a href="#use" data-tab="use">Use it</a>
     </nav>
 
@@ -41,27 +41,38 @@
             </li>
             <li>Chrome or Edge on a computer, and a USB-C cable that carries data</li>
           </ul>
-          <p>No power switch: when it's done, or nothing happens for a while, the board goes to deep sleep (months on that battery). <strong>Press its reset button to wake it.</strong></p>
+          <p>No power switch: when it's done, or nothing happens for a while, the board goes to deep sleep (months on that battery). <strong>Press its BOOT button (or reset) to wake it.</strong></p>
           <h2>1. The program</h2>
-          <p>Plug the XIAO into this computer and press Install. A new board: let it erase. To update one, don't: its firmwares stay.</p>
-          <esp-web-install-button id="install" manifest="fw/xiaoplus/manifest.json">
+          <p>Pick your board, and plug it into this computer. A new board: hold its BOOT button, tap reset, and let go (its download mode). One with lilfm1buddy on it: if its <code>LILBUDDY</code> drive shows up on this computer, <strong>eject it first</strong> (its LED goes blue: it's ready to install). Then press Install. A new board, or one with lilfm1buddy 0.1 on it: let it erase. To update one, don't: its files stay. Then tap reset.</p>
+          <p class="bad"><strong>Erasing deletes everything on its drive</strong>, backups too: copy them to your computer first.</p>
+          <p class="row">
+            <select id="boardtype" aria-label="your board">
+              <option value="">Pick your board…</option>
+              <option value="xiaoplus">Seeed XIAO ESP32S3 Plus</option>
+              <option value="xiao">Seeed XIAO ESP32S3</option>
+              <option value="zero">Waveshare ESP32-S3-Zero</option>
+              <option value="devkit">ESP32-S3 DevKit (N16R8)</option>
+            </select>
+          </p>
+          <esp-web-install-button id="install" hidden>
             <button slot="activate" class="button">Install lilfm1buddy</button>
             <span slot="unsupported">Your browser can't: use Chrome or Edge on a computer.</span>
             <span slot="not-allowed">This page has to be opened over https.</span>
           </esp-web-install-button>
           <p id="nofw" class="bad" hidden>No build yet: the page has no firmware next to it.</p>
           <h2>2. JieLi's loader, and firmwares</h2>
-          <p>The board writes the FM-1's flash with the loader JieLi made for its chip (<code>wl82loader.bin</code>). It isn't ours to hand out: this page gets it from <a href="https://github.com/kagaimiq/jl-uboot-tool">jl-uboot-tool</a>, checks it, and puts it on the board. Then add the firmwares you want on it.</p>
-          <p><a href="#firmwares" class="button" data-tab="firmwares">Go to Firmwares</a></p>
+          <p>On a computer the board is a USB drive, <code>LILBUDDY</code> (its LED cyan). Put <code>.fwsc</code> firmwares on it (drag them there, or from the Drive tab). Eject it when you're done.</p>
+          <p>The board writes the FM-1's flash with the loader JieLi made for its chip (<code>wl82loader.bin</code>). It isn't ours to hand out: the Drive tab gets it from <a href="https://github.com/kagaimiq/jl-uboot-tool">jl-uboot-tool</a>, checks it, and puts it on the drive.</p>
+          <p><a href="#drive" class="button" data-tab="drive">Go to Drive</a></p>
         </section>
       </div>
 
-      <div data-page="firmwares" hidden>
+      <div data-page="drive" hidden>
         <section class="panel">
-          <p>The board plugged into this computer (after its program is installed): press Connect, and pick its serial port.</p>
+          <p>The board on this computer is a USB drive: press Open, and pick it, <code>LILBUDDY</code>.</p>
           <p class="row">
-            <button id="connect" class="button">Connect</button>
-            <span id="board" class="dim"></span>
+            <button id="open" class="button">Open the drive</button>
+            <span id="drive" class="dim"></span>
           </p>
           <div id="manage" hidden>
             <h2>JieLi's loader</h2>
@@ -69,22 +80,24 @@
               <span id="loader"></span>
               <button id="getloader" class="button small" hidden>Get it</button>
             </p>
-            <h2>Firmwares</h2>
-            <p class="dim" id="space"></p>
+            <h2>The menus on the FM-1 and SMK-37</h2>
+            <div id="menus"></div>
+            <h2>Firmwares and backups</h2>
+            <p class="dim">The FM-1's menu shows the first 23, by name, after "Back up this FM-1".</p>
             <table id="files">
               <thead>
                 <tr>
-                  <th>Firmware</th>
+                  <th>File</th>
                   <th class="num">Size</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody></tbody>
             </table>
-            <h2>Add one from the <a href="https://thefirmwarehub.com">FM-1 Firmware Hub</a></h2>
+            <h2>Add one from <a href="https://mutant.cloud">mutant.cloud</a></h2>
             <p class="row">
               <select id="hub" disabled>
-                <option>Getting the Hub's list…</option>
+                <option>Getting mutant.cloud's list…</option>
               </select>
               <button id="addhub" class="button" disabled>Add</button>
             </p>
@@ -94,55 +107,75 @@
               <label class="button">Add .fwsc files<input id="add" type="file" accept=".fwsc" multiple hidden /></label>
             </p>
             <p id="busy" class="dim"></p>
+            <h2>MIDI routing</h2>
+            <p id="map" class="dim"></p>
+            <p>Make one on <a href="https://konsumer.js.org/fm1buddy/#midimap">fm1buddy's MIDI map page</a> (it learns each control from your devices), and put it on the drive as <code>midimap.txt</code>. Add a line <code>bluetooth</code> to enable Bluetooth MIDI.</p>
             <details>
-              <summary>What happened last time on the FM-1 (the board's log)</summary>
-              <p><button id="getlog" class="button small">Show it</button></p>
+              <summary>What happened last time on the FM-1 (<code>log.txt</code>)</summary>
               <pre id="log"></pre>
             </details>
           </div>
-          <p id="noserial" class="bad" hidden>Your browser has no Web Serial: use Chrome or Edge on a computer.</p>
+          <p id="nofs" class="bad" hidden>Your browser can't open folders: use Chrome or Edge on a computer, or drag files onto the drive yourself.</p>
         </section>
       </div>
 
       <div data-page="use" hidden>
         <section class="panel">
           <ol>
-            <li>Press the XIAO's reset button to wake it, and plug it into the FM-1 (switched on) with a USB-C data cable: no hub, no charger.</li>
-            <li>With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With any other (SLOOP, ...), or none, the LED says <em>switch it off, then on</em>: do.</li>
-            <li>The FM-1 shows the list. Turn any knob to move, press any button to pick, and again to be sure. A piano key jumps to its row. The top of the screen shows both batteries: the FM-1's, and the XIAO's.</li>
-            <li>The board writes it, then the FM-1 starts it, and the board goes to sleep. Unplug it.</li>
+            <li>Plug the board into the FM-1 (switched on) with a USB-C data cable, or into a powered hub with the FM-1 and other MIDI devices on it. Its LED goes green.</li>
+            <li>With a <code>midimap.txt</code> on its drive, it routes MIDI between them (make one on <a href="https://konsumer.js.org/fm1buddy/#midimap">fm1buddy's MIDI map page</a>; a line <code>bluetooth</code> adds Bluetooth MIDI). Without one, it waits.</li>
+            <li><strong>Press BOOT</strong> for the menu on the FM-1's screen. With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With any other (SLOOP, ...), or none, the LED says <em>switch it off, then on</em>: do (the FM-1 straight on the board for this, no hub).</li>
+            <li>The FM-1 shows the list: <em>Back up this FM-1</em>, then the firmwares and backups. Turn SEL to move, press OCT+ to pick, and OCT+ again to be sure (anything else goes back).</li>
+            <li>The board writes it (or backs it up to <code>fm1-N.bin</code>), the FM-1 starts, and the board goes to sleep. Unplug it.</li>
           </ol>
-          <h2>The XIAO's LED</h2>
+          <h2>The LED</h2>
           <table>
             <tbody>
               <tr>
+                <td>on a computer: a USB drive (flashes as it's read or written)</td>
+                <td>cyan</td>
+              </tr>
+              <tr>
+                <td>ejected: a serial port, until it's unplugged</td>
+                <td>blue</td>
+              </tr>
+              <tr>
+                <td>on the FM-1, waiting for BOOT</td>
+                <td>dim green</td>
+              </tr>
+              <tr>
+                <td>routing MIDI (flashes as it goes through)</td>
+                <td>green</td>
+              </tr>
+              <tr>
                 <td>looking for the FM-1</td>
-                <td>a blip a second</td>
+                <td>a blue blip a second</td>
               </tr>
               <tr>
                 <td>switch the FM-1 off, then on</td>
-                <td>a slow blink</td>
+                <td>a slow yellow blink</td>
               </tr>
               <tr>
                 <td>pick one on the FM-1</td>
-                <td>on, a short gap a second</td>
+                <td>cyan, a short gap a second</td>
               </tr>
               <tr>
-                <td>writing it</td>
-                <td>a fast blink</td>
+                <td>backing it up / writing it</td>
+                <td>a fast white / magenta blink</td>
               </tr>
               <tr>
                 <td>done</td>
-                <td>on (then it sleeps)</td>
+                <td>bright green (then it sleeps)</td>
               </tr>
               <tr>
-                <td>it didn't (the Firmwares tab shows its log)</td>
-                <td>three blips, a pause</td>
+                <td>it didn't (<code>log.txt</code> on its drive says why)</td>
+                <td>three red blips, a pause</td>
               </tr>
             </tbody>
           </table>
-          <p>Until a firmware is picked nothing is written: to keep what's on it, switch the FM-1 off and on. Only the firmware's own image is written, never the flash's head (what the chip starts from), and the chip's boot loader is in its ROM: nothing here can make it unrecoverable.</p>
-          <p>How it works, and the code: <a href="https://github.com/konsumer/lilfm1buddy">github.com/konsumer/lilfm1buddy</a>. Its bigger sibling, with a touch screen, Wi-Fi and MIDI routing: <a href="https://konsumer.github.io/fm1buddy/">fm1buddy</a>.</p>
+          <p>The XIAO's LED is one colour: the same blinks, without the colours.</p>
+          <p>Until something is picked nothing is written: to keep what's on it, switch the FM-1 off and on. Only the firmware's own image is written, never the flash's head (what the chip starts from), and the chip's boot loader is in its ROM: nothing here can make it unrecoverable.</p>
+          <p>How it works, and the code: <a href="https://github.com/konsumer/lilfm1buddy">lilfm1buddy</a>. Its bigger sibling, with a touch screen and Wi-Fi: <a href="https://konsumer.github.io/fm1buddy/">fm1buddy</a>.</p>
         </section>
       </div>
     </main>

@@ -1,6 +1,5 @@
 # Name,   Type, SubType, Offset,   Size
+# the program, and the rest a FAT drive (disk.cpp). 0xE000: boot_app0.bin (unused, but the build writes it)
 nvs,      data, nvs,     0x9000,   0x5000,
-otadata,  data, ota,     0xe000,   0x2000,
-app0,     app,  ota_0,   0x10000,  0x150000,
-spiffs,   data, spiffs,  0x160000, 0x290000,
-coredump, data, coredump,0x3F0000, 0x10000,
+factory,  app,  factory, 0x10000,  0xD0000,
+drive,    data, fat,     0xE0000,  0x320000,

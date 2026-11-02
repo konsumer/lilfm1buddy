@@ -1,9 +1,10 @@
-// lilfm1buddy's page: tabs, the install button's firmware, and the board's files over Web Serial (esp32/main.cpp's
-// commands: info, ls, rm NAME, put NAME BYTES, log)
+// lilfm1buddy's page: tabs, the install button's firmware, and the board's USB drive (BOOT on a computer), opened as a
+// folder (File System Access: Chrome, Edge). Its files: *.fwsc firmwares, *.bin backups, wl82loader.bin, midimap.txt,
+// log.txt (esp32/main.cpp)
 
+const LOADER = 'wl82loader.bin'
 const LOADER_URL = 'https://raw.githubusercontent.com/kagaimiq/jl-uboot-tool/c32b28e7a04f873f526ba929cb1bae9f05442fe9/data/loaderblobs/usb/wl82loader.bin'
 const LOADER_SHA256 = 'd41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68dca5376'
-const PIECE = 4096 // what the board takes before an ACK
 const HUB = 'https://thefirmwarehub.com/' // the FM-1 Firmware Hub: catalog.json, and the packages next to it
 
 const $ = (s) => document.querySelector(s)
@@ -30,135 +31,11 @@ fetch($('#install').getAttribute('manifest'))
     $('#nofw').hidden = false
   })
 
-// ---- the board, over serial ----
-class Board {
-  async open() {
-    this.port = await navigator.serial.requestPort()
-    await this.port.open({ baudRate: 115200 })
-    this.lines = []
-    this.waiting = null
-    this.reading = this.read()
-  }
-
-  async read() {
-    const decoder = new TextDecoder()
-    let rest = ''
-    this.reader = this.port.readable.getReader()
-    try {
-      for (;;) {
-        const { value, done } = await this.reader.read()
-        if (done) break
-        rest += decoder.decode(value, { stream: true })
-        let i
-        while ((i = rest.indexOf('\n')) >= 0) {
-          this.lines.push(rest.slice(0, i).replace(/\r$/, ''))
-          rest = rest.slice(i + 1)
-        }
-        if (this.waiting) this.waiting()
-      }
-    } catch (e) {}
-  }
-
-  async close() {
-    try {
-      await this.reader.cancel()
-      await this.reading
-      await this.port.close()
-    } catch (e) {}
-  }
-
-  async send(text) {
-    await this.write(new TextEncoder().encode(text + '\n'))
-  }
-
-  async write(bytes) {
-    const w = this.port.writable.getWriter()
-    await w.write(bytes)
-    w.releaseLock()
-  }
-
-  // the next line that test() likes (others are the board's log), within ms
-  async line(test, ms = 5000) {
-    const end = Date.now() + ms
-    for (;;) {
-      const i = this.lines.findIndex(test)
-      if (i >= 0) return this.lines.splice(0, i + 1).pop()
-      const left = end - Date.now()
-      if (left <= 0) throw new Error('The board stopped answering.')
-      await new Promise((resolve) => {
-        this.waiting = resolve
-        setTimeout(resolve, left)
-      })
-      this.waiting = null
-    }
-  }
-
-  async command(text, test, ms) {
-    this.lines = []
-    await this.send(text)
-    return this.line(test, ms)
-  }
-
-  async info() {
-    const l = await this.command('info', (l) => l.startsWith('INFO '))
-    const [, name, version, ...kv] = l.split(' ')
-    const info = { name, version }
-    for (const p of kv) {
-      const [k, v] = p.split('=')
-      info[k] = Number(v)
-    }
-    return info
-  }
-
-  async ls() {
-    this.lines = []
-    await this.send('ls')
-    const files = []
-    for (;;) {
-      const l = await this.line((l) => l.startsWith('FILE ') || l === 'END')
-      if (l === 'END') return files
-      const [, name, size] = l.split(' ')
-      files.push({ name, size: Number(size) })
-    }
-  }
-
-  async rm(name) {
-    const l = await this.command(`rm ${name}`, (l) => l === 'OK' || l.startsWith('ERR '))
-    if (l !== 'OK') throw new Error(l.slice(4))
-  }
-
-  async put(name, bytes, progress) {
-    let l = await this.command(`put ${name} ${bytes.length}`, (l) => l === 'READY' || l.startsWith('ERR '))
-    if (l !== 'READY') throw new Error(l.slice(4))
-    for (let at = 0; at < bytes.length; at += PIECE) {
-      await this.write(bytes.subarray(at, at + PIECE))
-      l = await this.line((l) => l.startsWith('ACK ') || l.startsWith('ERR '), 10000)
-      if (l.startsWith('ERR ')) throw new Error(l.slice(4))
-      progress?.(Math.min(at + PIECE, bytes.length), bytes.length)
-    }
-    l = await this.line((l) => l.startsWith('OK ') || l.startsWith('ERR '), 30000)
-    if (l.startsWith('ERR ')) throw new Error(l.slice(4))
-  }
-
-  // everything up to END (the log is the board's own lines: all of them)
-  async log() {
-    this.lines = []
-    await this.send('log')
-    const end = Date.now() + 10000
-    while (!this.lines.includes('END')) {
-      if (Date.now() > end) throw new Error('The board stopped answering.')
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    }
-    const out = this.lines.slice(0, this.lines.indexOf('END'))
-    this.lines = []
-    return out.join('\n')
-  }
-}
-
-// ---- the Firmwares tab ----
-let board = null
+// ---- the drive ----
+let drive = null
 
 const kb = (n) => `${Math.round(n / 1024).toLocaleString()} KB`
+const isFirmware = (n) => n !== LOADER && !n.startsWith('.') && /\.(fwsc|bin)$/i.test(n)
 
 function busy(text) {
   $('#busy').textContent = text || ''
@@ -171,23 +48,43 @@ async function sha256(bytes) {
   return [...h].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+async function read(name) {
+  try {
+    return await (await drive.getFileHandle(name)).getFile()
+  } catch (e) {
+    return null
+  }
+}
+
+async function put(name, bytes) {
+  const w = await (await drive.getFileHandle(name, { create: true })).createWritable()
+  await w.write(bytes)
+  await w.close()
+}
+
 async function refresh() {
-  const info = await board.info()
-  $('#board').textContent = `${info.name} ${info.version}${info.battery ? `, battery ${(info.battery / 1000).toFixed(2)} V` : ''}`
-  $('#loader').innerHTML = info.loader ? '<span class="good">On the board.</span>' : '<span class="bad">Not on the board yet: it can\'t write the FM-1 without it.</span>'
-  $('#getloader').hidden = !!info.loader
-  $('#space').textContent = `${kb(info.free)} free of ${kb(info.total)}. The FM-1's menu shows the first 24, by name.`
-  const files = (await board.ls()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  const loader = await read(LOADER)
+  const ok = loader && (await sha256(await loader.arrayBuffer())) === LOADER_SHA256
+  $('#loader').innerHTML = ok ? '<span class="good">On the drive.</span>' : '<span class="bad">Not on the drive yet: it can\'t write the FM-1 without it.</span>'
+  $('#getloader').hidden = ok
+  $('#map').textContent = (await read('midimap.txt')) ? 'midimap.txt is on the drive: the board routes MIDI on the FM-1.' : 'No midimap.txt: no MIDI routing.'
+  const files = []
+  for await (const [name, h] of drive.entries()) {
+    if (h.kind === 'file' && isFirmware(name)) files.push(await h.getFile())
+  }
+  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
   const body = $('#files tbody')
   body.innerHTML = ''
   for (const f of files) {
     const tr = document.createElement('tr')
     tr.innerHTML = `<td></td><td class="num">${kb(f.size)}</td><td><button class="icon" title="Remove" aria-label="Remove ${f.name}">${TRASH}</button></td>`
-    tr.firstChild.textContent = f.name.replace(/\.fwsc$/i, '')
-    tr.querySelector('button').addEventListener('click', () => run(`Removing ${f.name}…`, () => board.rm(f.name)))
+    tr.firstChild.textContent = f.name
+    tr.querySelector('button').addEventListener('click', () => run(`Removing ${f.name}…`, () => drive.removeEntry(f.name)))
     body.append(tr)
   }
   if (!files.length) body.innerHTML = '<tr><td colspan="3" class="dim">None yet.</td></tr>'
+  const log = await read('log.txt')
+  $('#log').textContent = log ? await log.text() : '(nothing yet)'
 }
 
 // one thing at a time, then the list again
@@ -204,40 +101,22 @@ async function run(what, fn) {
   }
 }
 
-if (!('serial' in navigator)) {
-  $('#connect').disabled = true
-  $('#noserial').hidden = false
+if (!('showDirectoryPicker' in window)) {
+  $('#open').disabled = true
+  $('#nofs').hidden = false
 }
 
-$('#connect').addEventListener('click', async () => {
-  if (board) {
-    await board.close()
-    board = null
-    $('#manage').hidden = true
-    $('#connect').textContent = 'Connect'
-    $('#board').textContent = ''
-    return
-  }
+$('#open').addEventListener('click', async () => {
   try {
-    board = new Board()
-    await board.open()
-    $('#board').textContent = 'Asking it…'
-    let ok = false
-    for (let t = 0; t < 4 && !ok; t++) {
-      // (opening the port may restart it: it listens again a moment later)
-      try {
-        await refresh()
-        ok = true
-      } catch (e) {}
-    }
-    if (!ok) throw new Error('No answer: is lilfm1buddy installed on it? (Install tab)')
+    drive = await window.showDirectoryPicker({ id: 'lilfm1', mode: 'readwrite' })
+    $('#drive').textContent = drive.name
     $('#manage').hidden = false
-    $('#connect').textContent = 'Disconnect'
+    await run('Reading it…', async () => {})
   } catch (e) {
-    if (board) await board.close()
-    board = null
-    $('#board').innerHTML = '<span class="bad"></span>'
-    $('#board span').textContent = e.message
+    if (e.name !== 'AbortError') {
+      $('#drive').innerHTML = '<span class="bad"></span>'
+      $('#drive span').textContent = e.message
+    }
   }
 })
 
@@ -247,7 +126,7 @@ $('#getloader').addEventListener('click', () =>
     if (!r.ok) throw new Error(`Couldn't get it (${r.status}).`)
     const bytes = new Uint8Array(await r.arrayBuffer())
     if ((await sha256(bytes)) !== LOADER_SHA256) throw new Error("That isn't the loader it should be.")
-    await board.put('wl82loader.bin', bytes, (done, total) => busy(`Sending JieLi's loader… ${Math.round((done * 100) / total)}%`))
+    await put(LOADER, bytes)
   })
 )
 
@@ -255,19 +134,9 @@ $('#add').addEventListener('change', async (ev) => {
   const files = [...ev.target.files]
   ev.target.value = ''
   run('Adding…', async () => {
-    for (const f of files) {
-      const name = f.name.replace(/[^A-Za-z0-9._+-]/g, '_')
-      const bytes = new Uint8Array(await f.arrayBuffer())
-      await board.put(name, bytes, (done, total) => busy(`${name}: ${Math.round((done * 100) / total)}%`))
-    }
+    for (const f of files) await put(f.name.replace(/[^A-Za-z0-9._+-]/g, '_'), f)
   })
 })
-
-$('#getlog').addEventListener('click', () =>
-  run('Reading its log…', async () => {
-    $('#log').textContent = (await board.log()) || '(nothing yet)'
-  })
-)
 
 // ---- the Hub's firmwares ----
 let hub = []
@@ -312,6 +181,6 @@ $('#addhub').addEventListener('click', () => {
     if (!r.ok) throw new Error(`The Hub didn't give it (${r.status}).`)
     const bytes = new Uint8Array(await r.arrayBuffer())
     if (bytes.length !== f.size || (await sha256(bytes)) !== f.sha256) throw new Error("It didn't come as the Hub's list says: try again.")
-    await board.put(name, bytes, (done, total) => busy(`${name}: ${Math.round((done * 100) / total)}%`))
+    await put(name, bytes)
   })
 })

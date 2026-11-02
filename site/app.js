@@ -6,7 +6,7 @@ const LOADER = 'wl82loader.bin'
 const MENUS = { 'lilfm1.bin': 'FM-1', 'lilsmk.bin': 'SMK-37' } // the menus on their screens (picker/): the board needs the one for each device it's used on
 const LOADER_URL = 'https://raw.githubusercontent.com/kagaimiq/jl-uboot-tool/c32b28e7a04f873f526ba929cb1bae9f05442fe9/data/loaderblobs/usb/wl82loader.bin'
 const LOADER_SHA256 = 'd41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68dca5376'
-const HUB = 'https://thefirmwarehub.com/' // the FM-1 Firmware Hub: catalog.json, and the packages next to it
+const CLOUD = 'https://mutant.cloud/' // every FM-1 firmware: firmware.json, and its packages (dl/) with CORS on
 
 const $ = (s) => document.querySelector(s)
 const TRASH = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>'
@@ -173,17 +173,24 @@ $('#add').addEventListener('change', async (ev) => {
   })
 })
 
-// ---- the Hub's firmwares ----
+// ---- mutant.cloud's firmwares: one choice for each FM-1 package in each one's latest release, downloaded through
+// mutant.cloud/dl/ID/FILE (GitHub's downloads can't be read from a page) and checked against its size and SHA-256 ----
 let hub = []
 
-const label = (f) => `${f.name}${f.version ? ' ' + f.version : ''}${f.author ? ' (' + f.author + ')' : ''}${f.beta ? ' beta' : ''}`
+const label = (f) => `${f.name} ${f.version}${f.variant ? ` (${f.variant})` : ''}${f.beta ? ' beta' : ''}, ${f.author}`
 
-fetch(HUB + 'catalog.json')
+fetch(CLOUD + 'firmware.json?device=fm1')
   .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
   .then((c) => {
-    const ok = (f) => f.pkg && f.size && /^[0-9a-f]{64}$/.test(f.sha256 || '') && !f.pkg.includes('..')
-    hub = (c.firmwares || []).filter(ok).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-    if (c.stock && ok(c.stock)) hub.unshift({ ...c.stock, name: `M-VAVE stock ${c.stock.product.replace('FM-1_0', 'V')}`, what: "The FM-1's own firmware." })
+    for (const e of c.entries || []) {
+      if (e.kind !== 'firmware' || e.archived || !e.release) continue
+      const pkgs = (e.release.assets || []).filter((a) => /^FM-1_/.test(a.product || '') && a.size && /^[0-9a-f]{64}$/.test(a.sha256 || '') && !a.missing)
+      for (const a of pkgs) {
+        const variant = pkgs.length > 1 ? a.name.replace(/\.fwsc$/i, '') : ''
+        hub.push({ id: e.id, file: a.name, size: a.size, sha256: a.sha256, name: e.name, author: e.author, beta: e.beta, what: e.description || '', variant, version: e.id === 'stock' ? a.product.replace('FM-1_0', 'V') : e.release.version.replace(/^v/, '') })
+      }
+    }
+    hub.sort((a, b) => (b.id === 'stock') - (a.id === 'stock') || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })) // (M-VAVE's own first)
     const sel = $('#hub')
     sel.innerHTML = '<option value="">Pick a firmware…</option>'
     hub.forEach((f, i) => {
@@ -195,27 +202,23 @@ fetch(HUB + 'catalog.json')
     sel.disabled = false
   })
   .catch(() => {
-    $('#hub').innerHTML = "<option>The Hub's list didn't come</option>"
+    $('#hub').innerHTML = "<option>mutant.cloud's list didn't come</option>"
   })
 
 $('#hub').addEventListener('change', () => {
   const f = hub[$('#hub').value]
-  $('#hubwhat').textContent = f ? f.what || '' : ''
+  $('#hubwhat').textContent = f ? f.what : ''
   $('#addhub').disabled = !f
 })
 
 $('#addhub').addEventListener('click', () => {
   const f = hub[$('#hub').value]
   if (!f) return
-  const name = f.pkg
-    .split('/')
-    .pop()
-    .replace(/[^A-Za-z0-9._+-]/g, '_')
   run(`Getting ${label(f)}…`, async () => {
-    const r = await fetch(HUB + f.pkg)
-    if (!r.ok) throw new Error(`The Hub didn't give it (${r.status}).`)
+    const r = await fetch(`${CLOUD}dl/${f.id}/${encodeURIComponent(f.file)}`)
+    if (!r.ok) throw new Error(`mutant.cloud didn't give it (${r.status}).`)
     const bytes = new Uint8Array(await r.arrayBuffer())
-    if (bytes.length !== f.size || (await sha256(bytes)) !== f.sha256) throw new Error("It didn't come as the Hub's list says: try again.")
-    await put(name, bytes)
+    if (bytes.length !== f.size || (await sha256(bytes)) !== f.sha256) throw new Error("It didn't come as mutant.cloud's list says: try again.")
+    await put(f.file.replace(/[^A-Za-z0-9._+-]/g, '_'), bytes)
   })
 })

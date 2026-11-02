@@ -3,10 +3,10 @@
  * (the menu) */
 /* lilfm1buddy's picker: felucca-bsp's update loader (loader/loader.c, ldr_screen.c), with a menu in front.
  *
- * The ESP32 writes it to RAM through the boot ROM and jumps to it (esp32/rom.cpp): built in, or _lil on its
- * drive. It's then a USB-MIDI device ("Felucca Update", 1209:0002) that answers M-UPGRADE as "ota-FM-1_900", as the
+ * The ESP32 writes it to RAM through the boot ROM and jumps to it (esp32/rom.cpp): built in, or lilfm1.bin on
+ * its drive. It's then a USB-MIDI device ("Felucca Update", 1209:0002) that answers M-UPGRADE as "ota-FM-1_900", as the
  * loader does, and speaks the ESP32's commands (esp32/main.cpp), a line in each SysEx: F0 7D 4C 42 TEXT F7. It asks
- * "info" (for the ESP32's battery) and "ls" (the firmwares and backups on its drive), once a second until both are
+ * "info" (for the ESP32's battery) and "ls" (the FM-1's firmwares and backups on its drive: the ESP32 says which), once a second until both are
  * answered; then, for the row picked, "install NAME" or "backup" (once a second, until the ESP32 sends the boot ROM's
  * key, F0 22 24 35 7D F7, and does it).
  *
@@ -118,29 +118,15 @@ static void pk_say(const char *a, const char *b)
   ota_wire_send(m, n);
 }
 
-static int pk_ends(const char *s, uint32_t n, const char *e)
-{
-  uint32_t k = str_len(e), i;
-  if (n <= k)
-    return 0;
-  for (i = 0; i < k; i++) {
-    char c = s[n - k + i];
-    if ((c >= 'A' && c <= 'Z' ? c + 32 : c) != e[i])
-      return 0;
-  }
-  return 1;
-}
-
-/* "NAME BYTES" from ls: a row, if it's a firmware (.fwsc) or a backup (.bin) */
+/* "NAME BYTES KIND" from ls: a row, if it's for the FM-1 (KIND fm1: a firmware, or a backup) */
 static void pk_file(const char *s)
 {
-  uint32_t n = str_len(s), k;
-  while (n && s[n - 1u] != ' ')
-    n--;
-  if (n)
-    n--; /* (the name: up to the last space) */
-  if (!n || n > PK_FILE || pk_n >= PK_MAX || s[0] == '.' || !(pk_ends(s, n, ".fwsc") || pk_ends(s, n, ".bin")) ||
-      (n == 14u && !memcmp(s, "wl82loader.bin", 14)))
+  uint32_t n = str_len(s), k, spaces = 0;
+  if (n < 4u || !str_eq(s + n - 4u, " fm1") || pk_n >= PK_MAX)
+    return;
+  for (n -= 4u; n && spaces < 1u; n--) /* (the name: up to the space before BYTES) */
+    spaces += s[n - 1u] == ' ';
+  if (!n || n > PK_FILE)
     return;
   memcpy(pk_files[pk_n], s, n);
   pk_files[pk_n][n] = 0;

@@ -3,7 +3,7 @@
 // log.txt (esp32/main.cpp)
 
 const LOADER = 'wl82loader.bin'
-const MENU = '_lil' // the menu on the FM-1's screen (picker/), if it isn't the one built into the board
+const MENU = 'lilfm1.bin' // the menu on the FM-1's screen (picker/), if it isn't the one built into the board
 const LOADER_URL = 'https://raw.githubusercontent.com/kagaimiq/jl-uboot-tool/c32b28e7a04f873f526ba929cb1bae9f05442fe9/data/loaderblobs/usb/wl82loader.bin'
 const LOADER_SHA256 = 'd41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68dca5376'
 const HUB = 'https://thefirmwarehub.com/' // the FM-1 Firmware Hub: catalog.json, and the packages next to it
@@ -36,7 +36,7 @@ fetch($('#install').getAttribute('manifest'))
 let drive = null
 
 const kb = (n) => `${Math.round(n / 1024).toLocaleString()} KB`
-const isFirmware = (n) => n !== LOADER && !n.startsWith('.') && /\.(fwsc|bin)$/i.test(n)
+const isFirmware = (n) => n !== LOADER && !n.startsWith('.') && /\.(fwsc|bin)$/i.test(n) && !/^lil(fm1|smk)\.bin$/i.test(n)
 
 function busy(text) {
   $('#busy').textContent = text || ''

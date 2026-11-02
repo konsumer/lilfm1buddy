@@ -4,7 +4,8 @@
 //
 //   *.fwsc          firmwares (FM-1 packages)
 //   *.bin           backups of an FM-1's flash
-//   _lil            the menu on the FM-1's screen (picker/: run from its RAM), if it isn't the one built in
+//   lilfm1.bin      the menu on the FM-1's screen (picker/: run from its RAM), if it isn't the one built in
+//   lilsmk.bin      the same for the SMK-37 (none yet: its screen and keys aren't known)
 //   wl82loader.bin  JieLi's loader, for writing the FM-1's flash (the web page gets it)
 //   midimap.txt     MIDI routing on the FM-1 (fm1buddy's rules: midimap.h). A line "bluetooth" turns on Bluetooth
 //                   MIDI too, "bluetooth NAME" connects to a Bluetooth MIDI device of that name as well
@@ -20,7 +21,7 @@
 //   1. the FM-1 into its boot ROM: SysEx to its firmware (stock V15, Felucca-based ones). If that doesn't work, the
 //      board restarts into key mode (fm1buddy's key_s3.cpp), and the key does it as the FM-1 is switched on. The key
 //      needs the FM-1 straight on the port: no hub
-//   2. the menu (_lil, or the one built in) into its RAM, and a jump to it. Nothing is written to its flash:
+//   2. its menu (which it is, it says first: an FM-1 or an SMK-37), into its RAM, and a jump to it. Nothing is written to its flash:
 //      switching the FM-1 off and on brings its firmware back
 //   3. the menu asks for what it needs with the commands below, and for what's picked: "install NAME" (the FM-1
 //      back into its boot ROM, JieLi's loader, and the sectors from 0x4000 to the image's end that differ; its head,
@@ -33,12 +34,13 @@
 // answer ends with a line "OK" or "ERR why":
 //
 //   info               lilfm1buddy VERSION free=BYTES loader=0|1 battery=BARS (0..3, -1: it can't tell)
-//   ls                 NAME BYTES, a line for each file on the drive (names up to 60 characters)
+//   ls                 NAME BYTES KIND, a line for each file on the drive (names up to 60 characters). KIND: what
+//                      it's for, fm1 or smk (a firmware, a backup), or - (anything else)
 //   read OFF LEN NAME  LEN bytes (up to 64) of a file from OFF, in hex
 //   rm NAME            the file gone
 //   install NAME       (from the FM-1) that firmware or backup onto it; OK first, then it's done
 //   backup             (from the FM-1) its whole flash to fm1-N.bin (smk-N.bin: an SMK-37's); OK first
-//   run NAME           (from the FM-1) a program into its RAM (like _lil), and a jump to it; OK first
+//   run NAME           (from the FM-1) a program into its RAM (like lilfm1.bin), and a jump to it; OK first
 //   log                (serial) log.txt
 //   disk               (serial) the USB drive again
 #include <Arduino.h>
@@ -61,7 +63,9 @@
 #include "rom.h"
 
 #define MAP FS "/midimap.txt"
-#define MENU "_lil"
+// the menus: one for each device, its screen and keys (lilsmk.bin: none yet). The FM-1's is built in too
+#define MENU_FM1 "lilfm1.bin"
+#define MENU_SMK "lilsmk.bin"
 #define FLASH_SIZE 0x100000u
 // The SMK-37 (and its other names: fm1.h isSmk) is the FM-1's chip in a keyboard, the same to its boot ROM, but its
 // flash has its own factory calibration (keys, pads, wheels) in the sector at SMK_CAL, "trimdat" at SMK_MARK: unique
@@ -79,6 +83,15 @@ extern const uint8_t pickerEnd[] asm("_binary_build_picker_bin_end");
 #define SERIAL_MODE 0x53455249
 static RTC_NOINIT_ATTR uint32_t serialFlag;  // a restart into the serial port (the drive ejected)
 static bool computer, serial, fsOk;
+// which it is, an FM-1 or an SMK-37, as its firmware said (fm1.cpp's handshake), or as the menu that's on the drive
+// says; kept through key mode's restart
+enum Kind { KIND_NONE,
+            KIND_FM1,
+            KIND_SMK };
+static const char* KINDS[] = {"-", "fm1", "smk"};
+#define KIND_MAGIC 0x4B490000
+static RTC_NOINIT_ATTR uint32_t kindKept;
+static Kind kind;
 
 #define say(...) hal::log("lil: " __VA_ARGS__)
 
@@ -158,6 +171,14 @@ static const char* toRom() {
   say("Looking for the FM-1...");
   int d = find(15000);
   const char* e = "No FM-1 found.";
+  for (uint32_t t = millis(); d >= 0 && !fm1::known(d) && millis() - t < 5000; delay(50)) {
+    fm1::watch();  // (who it is: an FM-1 or an SMK-37)
+  }
+  if (const Fm1Id* id = d >= 0 ? fm1::known(d) : 0) {
+    kind = isSmk(id->model) ? KIND_SMK : KIND_FM1;
+    kindKept = KIND_MAGIC | kind;
+    say("It's %s (%s).", kind == KIND_SMK ? "an SMK-37" : "an FM-1", id->text);
+  }
   if (d >= 0 && !(e = rom::enter(d))) {
     e = rom::attach(10000);
   }
@@ -380,17 +401,45 @@ static const char* jieliLoader(std::vector<uint8_t>& out) {
              : "No wl82loader.bin on its drive (or not JieLi's).";
 }
 
-// the boot ROM there (after toRom, or enter): a program into the FM-1's RAM, and a jump to it. 0, or an error
+// the boot ROM there (after toRom, or enter): a program into the FM-1's RAM, and a jump to it (lilfm1.bin: the one
+// built in, if it isn't on the drive). 0, or an error
 static const char* runProgram(const char* name) {
   std::vector<uint8_t> p;
   if (load(name, p, PICKER_MAX)) {
     say("%s, from its drive", name);
     return rom::run(PICKER_AT, p.data(), p.size());
   }
-  if (strcmp(name, MENU)) {
-    return "No such program on its drive.";
+  if (strcmp(name, MENU_FM1)) {
+    return strcmp(name, MENU_SMK) ? "No such program on its drive." : "No menu for the SMK-37 (lilsmk.bin) on its drive.";
   }
-  return rom::run(PICKER_AT, pickerStart, pickerEnd - pickerStart);  // (the menu built in)
+  return rom::run(PICKER_AT, pickerStart, pickerEnd - pickerStart);
+}
+
+// what a file on the drive is for: a firmware (its package says who for) or a backup (an SMK-37's has its
+// calibration's mark), else none
+static Kind kindOf(const char* name) {
+  FILE* f = fopen((FS "/" + std::string(name)).c_str(), "rb");
+  if (!f) {
+    return KIND_NONE;
+  }
+  static uint8_t head[64 * 0x30];  // (a package's identity blocks: fm1.h pkgHead)
+  char product[24];
+  uint32_t blocks;
+  Kind k = KIND_NONE;
+  fseek(f, 0, SEEK_END);
+  long n = ftell(f);
+  if (endsWith(name, ".fwsc")) {
+    fseek(f, 0, SEEK_SET);
+    size_t got = fread(head, 1, sizeof head, f);
+    if (pkgHead(head, got, product, sizeof product, blocks)) {
+      k = isSmk(product) ? KIND_SMK : !strncmp(product, "FM-1_", 5) ? KIND_FM1
+                                                                    : KIND_NONE;
+    }
+  } else if (endsWith(name, ".bin") && n == FLASH_SIZE && !fseek(f, SMK_MARK, SEEK_SET)) {
+    k = fread(head, 1, 7, f) == 7 && !memcmp(head, "trimdat", 7) ? KIND_SMK : KIND_FM1;
+  }
+  fclose(f);
+  return k;
 }
 
 // ---- the commands ----
@@ -456,7 +505,7 @@ static void command(const char* line, int dev) {
       while (dirent* e = readdir(d)) {
         struct stat st;
         if (fileName(e->d_name) && !stat((FS "/" + std::string(e->d_name)).c_str(), &st) && S_ISREG(st.st_mode)) {
-          reply("%s %u", e->d_name, (unsigned)st.st_size);
+          reply("%s %u %s", e->d_name, (unsigned)st.st_size, KINDS[kindOf(e->d_name)]);
         }
       }
       closedir(d);
@@ -483,8 +532,14 @@ static void command(const char* line, int dev) {
       return;
     }
   } else if (fm1 && (!strcmp(cmd, "install") || !strcmp(cmd, "run"))) {
-    if (!exists(arg) && strcmp(arg, MENU)) {
+    Kind k = cmd[0] == 'i' ? kindOf(arg) : KIND_NONE;
+    if (!exists(arg) && strcmp(arg, MENU_FM1)) {
       reply("ERR No such file.");
+      return;
+    }
+    if (cmd[0] == 'i' && (!k || (kind && k != kind))) {
+      reply("ERR %s", !k ? "That isn't a firmware or a backup." : k == KIND_SMK ? "That's for an SMK-37, not an FM-1."
+                                                                                : "That's for an FM-1, not an SMK-37.");
       return;
     }
     act = cmd[0] == 'i' ? ACT_INSTALL : ACT_RUN, actFile = arg, actDev = dev;
@@ -512,7 +567,10 @@ static void command(const char* line, int dev) {
 static const char* startMenu() {
   midi::route(false);
   const char* e = toRom();
-  if (!e && !(e = runProgram(MENU))) {
+  if (!kind) {  // (it didn't say: the menu that's on the drive, the FM-1's if both are or none)
+    kind = exists(MENU_SMK) && !exists(MENU_FM1) ? KIND_SMK : KIND_FM1;
+  }
+  if (!e && !(e = runProgram(kind == KIND_SMK ? MENU_SMK : MENU_FM1))) {
     led(LED_PICK);
     say("The menu's on the FM-1.");
   }
@@ -641,6 +699,10 @@ void setup() {
   if (hal::recoveryMode() && fsOk) {
     logLoad();
   }
+  if (hal::recoveryMode() && (kindKept & 0xFFFF0000) == KIND_MAGIC && (kindKept & 0xFFFF) <= KIND_SMK) {
+    kind = (Kind)(kindKept & 0xFFFF);
+  }
+  kindKept = 0;
   say("lilfm1buddy " VERSION ", on the FM-1%s", hal::recoveryMode() ? " (key mode)" : "");
   // the serial port off first: in key mode, Serial.end() drives D+ and D- low, and the key is on them
   esp_register_shutdown_handler(phyToSerial);

@@ -24,7 +24,7 @@
 //      switching the FM-1 off and on brings its firmware back
 //   3. the menu asks for what it needs with the commands below, and for what's picked: "install NAME" (the FM-1
 //      back into its boot ROM, JieLi's loader, and the sectors from 0x4000 to the image's end that differ; its head,
-//      what the chip starts from, and key_mac stay) or "backup" (its whole flash to backup-N.bin)
+//      what the chip starts from, and key_mac stay) or "backup" (its whole flash to fm1-N.bin)
 //
 // Then it sleeps (and when nothing's happening for a while): BOOT or its reset button wakes it.
 //
@@ -37,7 +37,7 @@
 //   read OFF LEN NAME  LEN bytes (up to 64) of a file from OFF, in hex
 //   rm NAME            the file gone
 //   install NAME       (from the FM-1) that firmware or backup onto it; OK first, then it's done
-//   backup             (from the FM-1) its whole flash to backup-N.bin; OK first
+//   backup             (from the FM-1) its whole flash to fm1-N.bin (smk-N.bin: an SMK-37's); OK first
 //   run NAME           (from the FM-1) a program into its RAM (like _lil), and a jump to it; OK first
 //   log                (serial) log.txt
 //   disk               (serial) the USB drive again
@@ -63,8 +63,9 @@
 #define MAP FS "/midimap.txt"
 #define MENU "_lil"
 #define FLASH_SIZE 0x100000u
-#define IDLE_MS 120000  // nothing to do for this long: sleep
-#define MENU_MS 600000  // (with the menu up: nothing picked)
+#define SMK_MARK 0xC1224u  // an SMK-37's: "trimdat" (fm1buddy's uboot.h)
+#define IDLE_MS 120000     // nothing to do for this long: sleep
+#define MENU_MS 600000     // (with the menu up: nothing picked)
 #define VERSION "0.3.0"
 
 // the menu built in (picker/build.sh: build/picker.bin)
@@ -176,19 +177,18 @@ static const char* toLoader(int d, const std::vector<uint8_t>& loader, rom::Chip
   return 0;
 }
 
-// the FM-1's whole flash to backup-N.bin: 0, or an error
+// the whole flash to fm1-N.bin, or smk-N.bin for an SMK-37 (its calibration's mark in it), as fm1buddy names them:
+// 0, or an error
 static const char* backup(int d, const std::vector<uint8_t>& loader) {
   if (disk::freeBytes() < FLASH_SIZE + 65536) {
     return "No room on the drive for a backup.";
   }
-  char path[40];
-  struct stat st;
-  for (int n = 1; snprintf(path, sizeof path, FS "/backup-%d.bin", n), !stat(path, &st); n++) {
-  }
+  const char* part = FS "/backup.part";
+  bool smk = false;
   led(LED_READING);
   rom::Chip chip;
   const char* e = toLoader(d, loader, chip);
-  FILE* f = e ? 0 : fopen(path, "wb");
+  FILE* f = e ? 0 : fopen(part, "wb");
   if (!e && !f) {
     e = "Can't write to the drive.";
   }
@@ -197,17 +197,22 @@ static const char* backup(int d, const std::vector<uint8_t>& loader) {
     if (!(e = rom::read(chip, a, buf, SECTOR)) && fwrite(buf, 1, SECTOR, f) != SECTOR) {
       e = "Can't write to the drive (full?).";
     }
+    smk |= a == SMK_MARK / SECTOR * SECTOR && !memcmp(buf + SMK_MARK % SECTOR, "trimdat", 7);
   }
   rom::leave();  // (it restarts, into its firmware)
   if (f) {
     fclose(f);
-    if (e) {
-      remove(path);
-    } else {
-      say("Saved %s", path + sizeof FS);
-    }
   }
-  return e;
+  char path[40];
+  struct stat st;
+  for (int n = 1; !e && (snprintf(path, sizeof path, FS "/%s-%d.bin", smk ? "smk" : "fm1", n), !stat(path, &st)); n++) {
+  }
+  if (e || rename(part, path)) {
+    remove(part);
+    return e ? e : "Can't write to the drive.";
+  }
+  say("Saved %s", path + sizeof FS);
+  return 0;
 }
 
 // a firmware (.fwsc) or a backup (.bin) onto the FM-1: 0, or an error

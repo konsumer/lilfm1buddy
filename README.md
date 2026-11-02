@@ -50,7 +50,7 @@ On the FM-1:
 3. The FM-1 shows the list, and both batteries at the top: "Back up this FM-1", then the firmwares and backups. Turn
    any knob to move, press any button to pick (and again to be sure), or a piano key to jump to its row. To keep
    what's on it, switch the FM-1 off and on.
-4. The board writes it (magenta), or backs it up to `backup-N.bin` (white), and the FM-1 starts: the LED green. Three
+4. The board writes it (magenta), or backs it up to `fm1-N.bin` (white), and the FM-1 starts: the LED green. Three
    red blips and a pause: it didn't (`log.txt` says why). Then the board goes to sleep.
 
 Until something is picked, nothing is written. Only the image is written (from `0x4000` to its end: `0x93000` for most

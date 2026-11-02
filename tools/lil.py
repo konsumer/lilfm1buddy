@@ -87,7 +87,7 @@ def command(text):
             return out
         if line.startswith('ERR'):
             sys.exit(line)
-        if line and not LOG_LINE.match(line):
+        if line and (text == 'log' or not LOG_LINE.match(line)):  # (log.txt is lines like the log's)
             out.append(line)
     sys.exit(f'no answer to {text}')
 

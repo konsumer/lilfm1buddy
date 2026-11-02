@@ -31,7 +31,9 @@ its program, and its log. Its program installs from its download mode too (hold 
 break. Dot files a computer leaves on the drive (macOS's `._` copies, trash, indexes) are cleared away by the board,
 and macOS is told not to make most of them. On the drive:
 
-- `*.fwsc`: firmwares; `*.bin`: backups of an FM-1 (made from its menu)
+- `*.fwsc`: firmwares; `*.bin`: backups, `fm1-N.bin` (or `smk-N.bin`, an SMK-37's: the FM-1's chip in a keyboard,
+  which it installs and backs up too). Each only goes onto its own kind: never an FM-1's onto an SMK-37, nor the other
+  way round, and an SMK-37's own calibration is never written
 - `wl82loader.bin`: JieLi's loader, for writing the FM-1's flash
 - `_lil`: the menu on the FM-1's screen (`picker/`, run from its RAM), if it isn't the one built into the board:
   the web page puts the latest there, so the board itself rarely needs updating

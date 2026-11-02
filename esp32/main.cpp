@@ -63,9 +63,13 @@
 #define MAP FS "/midimap.txt"
 #define MENU "_lil"
 #define FLASH_SIZE 0x100000u
-#define SMK_MARK 0xC1224u  // an SMK-37's: "trimdat" (fm1buddy's uboot.h)
-#define IDLE_MS 120000     // nothing to do for this long: sleep
-#define MENU_MS 600000     // (with the menu up: nothing picked)
+// The SMK-37 (and its other names: fm1.h isSmk) is the FM-1's chip in a keyboard, the same to its boot ROM, but its
+// flash has its own factory calibration (keys, pads, wheels) in the sector at SMK_CAL, "trimdat" at SMK_MARK: unique
+// to each keyboard, never written (fm1buddy's uboot.h). Its firmwares and backups are its own: never an FM-1's
+#define SMK_CAL 0xC1000u
+#define SMK_MARK 0xC1224u
+#define IDLE_MS 120000  // nothing to do for this long: sleep
+#define MENU_MS 600000  // (with the menu up: nothing picked)
 #define VERSION "0.3.0"
 
 // the menu built in (picker/build.sh: build/picker.bin)
@@ -172,7 +176,7 @@ static const char* toLoader(int d, const std::vector<uint8_t>& loader, rom::Chip
   }
   if (chip.key != FM1_KEY || chip.flashId != FM1_FLASH || chip.size != FLASH_SIZE) {
     rom::leave();
-    return "That isn't the FM-1's chip: nothing was done.";
+    return "That isn't the FM-1's (or SMK-37's) chip: nothing was done.";
   }
   return 0;
 }
@@ -215,13 +219,18 @@ static const char* backup(int d, const std::vector<uint8_t>& loader) {
   return 0;
 }
 
-// a firmware (.fwsc) or a backup (.bin) onto the FM-1: 0, or an error
+// a firmware (.fwsc) or a backup (.bin) onto the FM-1 or SMK-37, if it's one of its own: 0, or an error
+static bool smkMark(const uint8_t* calSector) {
+  return !memcmp(calSector + SMK_MARK - SMK_CAL, "trimdat", 7);
+}
+
 static const char* install(int d, const std::string& file, const std::vector<uint8_t>& loader) {
   static Pkg pkg;
   std::vector<uint8_t> raw;
   std::string path = FS "/" + file;
   const uint8_t* want;  // what the flash should have, from 0
   uint32_t end;         // up to here
+  bool forSmk;          // it's an SMK-37's
   const char* e;
   if (endsWith(file, ".bin")) {
     FILE* f = fopen(path.c_str(), "rb");
@@ -231,20 +240,22 @@ static const char* install(int d, const std::string& file, const std::vector<uin
       fclose(f);
     }
     if (n != FLASH_SIZE) {
-      return "That isn't a backup of an FM-1 (1 MB).";
+      return "That isn't a backup of an FM-1 or SMK-37 (1 MB).";
     }
     want = raw.data();
     end = WRITE_TO;
+    forSmk = smkMark(want + SMK_CAL);
   } else {
     uint32_t at;
     if ((e = pkg.open(path.c_str()))) {
       return e;
     }
-    if (!pkg.flash(at, end) || strncmp(pkg.product, "FM-1_", 5)) {
-      return "That package has no FM-1 flash image in it.";
+    forSmk = isSmk(pkg.product);
+    if (!pkg.flash(at, end) || (strncmp(pkg.product, "FM-1_", 5) && !forSmk)) {
+      return "That package has no FM-1 or SMK-37 flash image in it.";
     }
-    if (end <= WRITE_FROM || end > WRITE_TO) {
-      return "Its flash image is a size the FM-1's isn't.";
+    if (end <= WRITE_FROM || end > (forSmk ? SMK_CAL : WRITE_TO)) {
+      return "Its flash image is a size it can't be.";
     }
     want = pkg.image + at;
   }
@@ -253,11 +264,25 @@ static const char* install(int d, const std::string& file, const std::vector<uin
   if ((e = toLoader(d, loader, chip))) {
     return e;
   }
+  // which it is (its calibration, or none), before anything's written: its own firmwares and backups only
+  static uint8_t cal[SECTOR];
+  if ((e = rom::read(chip, SMK_CAL, cal, SECTOR))) {
+    rom::leave();
+    return e;
+  }
+  if (smkMark(cal) != forSmk) {
+    rom::leave();
+    return smkMark(cal) ? "That's an FM-1's, and this is an SMK-37: nothing was written."
+                        : "That's an SMK-37's, and this is an FM-1: nothing was written.";
+  }
   // a sector at a time: read, and written only if it differs
   uint32_t total = (end - WRITE_FROM + SECTOR - 1) / SECTOR, written = 0;
   static uint8_t now[SECTOR], sec[SECTOR];
   for (uint32_t a = WRITE_FROM, k = 1; !e && a < end; a += SECTOR, k++) {
     uint32_t n = std::min<uint32_t>(SECTOR, end - a);
+    if (forSmk && a == SMK_CAL) {
+      continue;  // (its calibration: its own, even restoring a backup)
+    }
     if ((e = rom::read(chip, a, now, SECTOR))) {
       break;
     }

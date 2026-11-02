@@ -21,13 +21,17 @@ for (const a of document.querySelectorAll('[data-tab]')) {
 }
 tab(location.hash.slice(1) || 'install')
 
-// ---- the program next to the page, for the board picked (remembered) ----
+// ---- the program next to the page, for the board picked (remembered). None until one is: another board's program
+// doesn't start (another flash size, PSRAM), so nothing is installed until it's said which ----
 function board(name) {
   $('#boardtype').value = name
-  $('#install').setAttribute('manifest', `fw/${name}/manifest.json`)
+  $('#install').hidden = true
+  $('#nofw').hidden = true
   try {
     localStorage.board = name
   } catch (e) {}
+  if (!name) return
+  $('#install').setAttribute('manifest', `fw/${name}/manifest.json`)
   fetch(`fw/${name}/manifest.json`)
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error('none'))))
     .then((m) => {
@@ -41,9 +45,9 @@ function board(name) {
     })
 }
 $('#boardtype').addEventListener('change', () => board($('#boardtype').value))
-let saved = 'xiaoplus'
+let saved = ''
 try {
-  saved = localStorage.board || saved
+  saved = localStorage.board || ''
 } catch (e) {}
 board(saved)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Drive lilfm1buddy on this computer, for development (or an agent working on it). It's the USB drive (LILFM1) when
+# Drive lilfm1buddy on this computer, for development (or an agent working on it). It's the USB drive (LILBUDDY) when
 # it's plugged in, and its serial port once that's ejected (esp32/main.cpp's console). Each command gets it where it
 # needs to be first:
 #
@@ -13,7 +13,7 @@
 import glob, os, re, subprocess, sys, time
 import serial
 
-LABEL = 'LILFM1'
+LABEL = 'LILBUDDY'
 LOG_LINE = re.compile(r'^\s*\d+\.\d (lil|disk|midi|rom|usb|key|ble):')  # (the board's log, between answers)
 
 

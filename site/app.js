@@ -3,7 +3,7 @@
 // log.txt (esp32/main.cpp)
 
 const LOADER = 'wl82loader.bin'
-const MENUS = { 'lilfm1.bin': 'FM-1', 'lilsmk.bin': 'SMK-37' } // the menus on their screens (picker/), if they aren't the ones built into the board
+const MENUS = { 'lilfm1.bin': 'FM-1', 'lilsmk.bin': 'SMK-37' } // the menus on their screens (picker/): the board needs the one for each device it's used on
 const LOADER_URL = 'https://raw.githubusercontent.com/kagaimiq/jl-uboot-tool/c32b28e7a04f873f526ba929cb1bae9f05442fe9/data/loaderblobs/usb/wl82loader.bin'
 const LOADER_SHA256 = 'd41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68dca5376'
 const HUB = 'https://thefirmwarehub.com/' // the FM-1 Firmware Hub: catalog.json, and the packages next to it
@@ -77,8 +77,8 @@ async function refresh() {
     const same = menu && latest && (await sha256(await menu.arrayBuffer())) === (await sha256(latest))
     const p = document.createElement('p')
     p.className = 'row'
-    p.innerHTML = '<span></span><button class="button small">Update it</button>'
-    p.firstChild.textContent = `${device}: ${menu ? `${name} on the drive${same ? ', the latest.' : '.'}` : 'the one built into the board.'}`
+    p.innerHTML = `<span></span><button class="button small">${menu ? 'Update it' : 'Put it on'}</button>`
+    p.firstChild.textContent = `${device}: ${menu ? `${name} on the drive${same ? ', the latest.' : '.'}` : `no ${name} on the drive (only needed if you have one).`}`
     p.lastChild.hidden = !latest || same
     p.lastChild.addEventListener('click', () => run(`Getting the latest ${device} menu…`, async () => put(name, new Uint8Array(latest))))
     $('#menus').append(p)

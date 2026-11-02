@@ -1,10 +1,10 @@
 // lilfm1buddy: an ESP32-S3 on the FM-1's USB port. What it does depends on what's on that port when it starts:
 //
-// A computer: a USB drive ("LILFM1") with what it keeps on it:
+// A computer: a USB drive ("LILBUDDY") with what it keeps on it:
 //
 //   *.fwsc          firmwares (FM-1 packages)
 //   *.bin           backups of an FM-1's flash
-//   lilfm1.bin      the menu on the FM-1's screen (picker/: run from its RAM), if it isn't the one built in
+//   lilfm1.bin      the menu on the FM-1's screen (picker/: run from its RAM; the web page gets it)
 //   lilsmk.bin      the same for the SMK-37
 //   wl82loader.bin  JieLi's loader, for writing the FM-1's flash (the web page gets it)
 //   midimap.txt     MIDI routing on the FM-1 (fm1buddy's rules: midimap.h). A line "bluetooth" turns on Bluetooth
@@ -63,7 +63,7 @@
 #include "rom.h"
 
 #define MAP FS "/midimap.txt"
-// the menus: one for each device, its screen and keys. Both are built in too
+// the menus: one for each device, its screen and keys (only on the drive, as JieLi's loader is)
 #define MENU_FM1 "lilfm1.bin"
 #define MENU_SMK "lilsmk.bin"
 #define FLASH_SIZE 0x100000u
@@ -75,12 +75,6 @@
 #define IDLE_MS 120000  // nothing to do for this long: sleep
 #define MENU_MS 600000  // (with the menu up: nothing picked)
 #define VERSION "0.3.0"
-
-// the menus built in (picker/build.sh), for a drive without them
-extern const uint8_t fm1MenuStart[] asm("_binary_build_lilfm1_bin_start");
-extern const uint8_t fm1MenuEnd[] asm("_binary_build_lilfm1_bin_end");
-extern const uint8_t smkMenuStart[] asm("_binary_build_lilsmk_bin_start");
-extern const uint8_t smkMenuEnd[] asm("_binary_build_lilsmk_bin_end");
 
 #define SERIAL_MODE 0x53455249
 static RTC_NOINIT_ATTR uint32_t serialFlag;  // a restart into the serial port (the drive ejected)
@@ -403,21 +397,17 @@ static const char* jieliLoader(std::vector<uint8_t>& out) {
              : "No wl82loader.bin on its drive (or not JieLi's).";
 }
 
-// the boot ROM there (after toRom, or enter): a program into the FM-1's RAM, and a jump to it (a menu: the one built
-// in, if it isn't on the drive). 0, or an error
+// the boot ROM there (after toRom, or enter): a program from the drive into its RAM, and a jump to it. 0, or an
+// error
 static const char* runProgram(const char* name) {
   std::vector<uint8_t> p;
-  if (load(name, p, PICKER_MAX)) {
-    say("%s, from its drive", name);
-    return rom::run(PICKER_AT, p.data(), p.size());
+  if (!load(name, p, PICKER_MAX)) {
+    static char e[80];
+    snprintf(e, sizeof e, "No %s on its drive (the web page puts it there).", name);
+    return e;
   }
-  if (!strcmp(name, MENU_FM1)) {
-    return rom::run(PICKER_AT, fm1MenuStart, fm1MenuEnd - fm1MenuStart);
-  }
-  if (!strcmp(name, MENU_SMK)) {
-    return rom::run(PICKER_AT, smkMenuStart, smkMenuEnd - smkMenuStart);
-  }
-  return "No such program on its drive.";
+  say("%s, from its drive", name);
+  return rom::run(PICKER_AT, p.data(), p.size());
 }
 
 // what a file on the drive is for: a firmware (its package says who for) or a backup (an SMK-37's has its
@@ -538,7 +528,7 @@ static void command(const char* line, int dev) {
     }
   } else if (fm1 && (!strcmp(cmd, "install") || !strcmp(cmd, "run"))) {
     Kind k = cmd[0] == 'i' ? kindOf(arg) : KIND_NONE;
-    if (!exists(arg) && strcmp(arg, MENU_FM1) && strcmp(arg, MENU_SMK)) {
+    if (!exists(arg)) {
       reply("ERR No such file.");
       return;
     }

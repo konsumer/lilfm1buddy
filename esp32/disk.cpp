@@ -27,7 +27,7 @@
 
 #define SS 512
 #define BLOCK 4096
-#define LABEL "LILFM1"
+#define LABEL "LILBUDDY"  // (FAT keeps it in capitals)
 
 static const esp_partition_t* part;
 static std::mutex lock;
@@ -200,9 +200,11 @@ bool disk::mount() {
     MKFS_PARM opt = {FM_ANY | FM_SFD, 1, 0, 0, 0};  // (one FAT: more room)
     static uint8_t work[BLOCK];
     r = f_mkfs(drive, &opt, work, sizeof work);
-    if (!r && !(r = f_mount(fs, drive, 1))) {
-      f_setlabel((std::string(drive) + LABEL).c_str());
-    }
+    r = r ? r : f_mount(fs, drive, 1);
+  }
+  char label[24];
+  if (!r && (f_getlabel(drive, label, 0) || strcmp(label, LABEL))) {  // (a new drive, or one named before)
+    f_setlabel((std::string(drive) + LABEL).c_str());
   }
   if (!r) {
     tidy();

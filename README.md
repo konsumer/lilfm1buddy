@@ -25,7 +25,7 @@ The board is the FM-1's USB host: each on its own battery, one USB-C data cable 
 
 ## Use it
 
-On a computer, the board is a USB drive, `LILFM1` (its LED cyan): put firmwares (`.fwsc`) and JieLi's `wl82loader.bin`
+On a computer, the board is a USB drive, `LILBUDDY` (its LED cyan): put firmwares (`.fwsc`) and JieLi's `wl82loader.bin`
 on it (the web page's Drive tab does both). Eject it and it's a serial port (blue) until it's unplugged: for installing
 its program, and its log. Its program installs from its download mode too (hold BOOT, tap reset), which nothing can
 break. Dot files a computer leaves on the drive (macOS's `._` copies, trash, indexes) are cleared away by the board,
@@ -35,9 +35,9 @@ and macOS is told not to make most of them. On the drive:
   which it installs and backs up too). Each only goes onto its own kind: never an FM-1's onto an SMK-37, nor the other
   way round, and an SMK-37's own calibration is never written
 - `wl82loader.bin`: JieLi's loader, for writing the FM-1's flash
-- `lilfm1.bin`, `lilsmk.bin`: the menus on the FM-1's and the SMK-37's screens (`picker/`, run from their RAM), if
-  they aren't the ones built into the board: the web page puts the latest there, so the board itself rarely needs
-  updating. The board asks the running firmware which it is, and loads its menu
+- `lilfm1.bin`, `lilsmk.bin`: the menus on the FM-1's and the SMK-37's screens (`picker/`, run from their RAM), for
+  the devices you have: the web page puts the latest there, so the board itself rarely needs updating. The board asks
+  the running firmware which it is, and loads its menu
 - `midimap.txt`: MIDI routing on the FM-1, with [fm1buddy](https://github.com/konsumer/fm1buddy)'s rules (none: no
   routing). A line `bluetooth` turns on Bluetooth MIDI (phones and computers connect to it, as `fm1buddy`), and
   `bluetooth NAME` connects to a Bluetooth MIDI device whose name has NAME in it
@@ -68,7 +68,7 @@ device (`4C4A:8057`) that takes commands, among them "write this to RAM" and "ju
 1. The ESP32 gets the FM-1 into its boot ROM: SysEx `F0 22 24 35 7D F7` from a firmware that takes it, or the USB key
    at power-on (fm1buddy's `key_s3.cpp`, after FM-1-transporter).
 2. It asks the running firmware which it is (an FM-1 or an SMK-37), and writes that one's **menu** (`lilfm1.bin` or
-   `lilsmk.bin` on its drive, or the one built in: `picker/`) to its RAM and jumps to it. Nothing is written to
+   `lilsmk.bin` on its drive: `picker/`) to its RAM and jumps to it. Nothing is written to
    flash.
 3. The menu starts the FM-1's screen, keys and USB (as a USB-MIDI device), and asks the ESP32 for what it needs with
    its commands, a line of text in each SysEx (`esp32/main.cpp` lists them: `info`, `ls`, `read`, `install`,

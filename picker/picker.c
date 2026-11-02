@@ -5,8 +5,8 @@
  * device), with a menu in front. Built for the FM-1 (lilfm1.bin) and, with FOMA_SMK37, the SMK-37 (lilsmk.bin: its
  * screen, and its keys, buttons and knobs through smk_input.h, which keeps fm1_input.h's calls).
  *
- * The ESP32 writes it to RAM through the boot ROM and jumps to it (esp32/rom.cpp): built in, or lilfm1.bin on
- * its drive. It's then a USB-MIDI device ("Felucca Update", 1209:0002) that answers M-UPGRADE as "ota-FM-1_900", as the
+ * The ESP32 writes it to RAM through the boot ROM and jumps to it (esp32/rom.cpp), from its drive (lilfm1.bin,
+ * lilsmk.bin). It's then a USB-MIDI device ("Felucca Update", 1209:0002) that answers M-UPGRADE as "ota-FM-1_900", as the
  * loader does, and speaks the ESP32's commands (esp32/main.cpp), a line in each SysEx: F0 7D 4C 42 TEXT F7. It asks
  * "info" (for the ESP32's battery) and "ls" (the FM-1's firmwares and backups on its drive: the ESP32 says which), once a second until both are
  * answered; then, for the row picked, "install NAME" or "backup" (once a second, until the ESP32 sends the boot ROM's

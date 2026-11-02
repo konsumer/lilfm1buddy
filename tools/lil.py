@@ -27,10 +27,13 @@ def wait(what, fn, s=20):
     sys.exit(f'no {what} after {s} s')
 
 
-def mounted():
+def mounted():  # (and its files there: the folder comes a moment before them)
     for p in [f'/Volumes/{LABEL}'] + glob.glob(f'/media/*/{LABEL}') + glob.glob(f'/run/media/*/{LABEL}'):
-        if os.path.isdir(p):
-            return p
+        try:
+            if os.listdir(p):  # (never empty: the board keeps .metadata_never_index there)
+                return p
+        except OSError:
+            pass
 
 
 def port():

@@ -33,7 +33,7 @@ and macOS is told not to make most of them. On the drive:
 
 - `*.fwsc`: firmwares; `*.bin`: backups of an FM-1 (made from its menu)
 - `wl82loader.bin`: JieLi's loader, for writing the FM-1's flash
-- `menu.ram`: the menu on the FM-1's screen (`picker/`, run from its RAM), if it isn't the one built into the board:
+- `_lil`: the menu on the FM-1's screen (`picker/`, run from its RAM), if it isn't the one built into the board:
   the web page puts the latest there, so the board itself rarely needs updating
 - `midimap.txt`: MIDI routing on the FM-1, with [fm1buddy](https://github.com/konsumer/fm1buddy)'s rules (none: no
   routing). A line `bluetooth` turns on Bluetooth MIDI (phones and computers connect to it, as `fm1buddy`), and
@@ -64,7 +64,7 @@ device (`4C4A:8057`) that takes commands, among them "write this to RAM" and "ju
 
 1. The ESP32 gets the FM-1 into its boot ROM: SysEx `F0 22 24 35 7D F7` from a firmware that takes it, or the USB key
    at power-on (fm1buddy's `key_s3.cpp`, after FM-1-transporter).
-2. It writes the **menu** (`menu.ram` on its drive, or the one built in: `picker/`) to the FM-1's RAM and jumps to
+2. It writes the **menu** (`_lil` on its drive, or the one built in: `picker/`) to the FM-1's RAM and jumps to
    it. Nothing is written to flash.
 3. The menu starts the FM-1's screen, keys and USB (as a USB-MIDI device), and asks the ESP32 for what it needs with
    its commands, a line of text in each SysEx (`esp32/main.cpp` lists them: `info`, `ls`, `read`, `install`,
@@ -99,7 +99,7 @@ npm run fmt                                          # the web page's formatting
 `tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`
 (mounts its drive, prints where), `eject` (its serial port), `flash ENV` (installs the program, then it's the drive
 again), and any of its commands (`info`, `ls`, `log`, `read OFF LEN NAME`, `rm NAME`). A new menu: build it
-(`picker/build.sh`), and copy `build/picker.bin` to the drive as `menu.ram`. Run it with PlatformIO's Python, which has pyserial:
+(`picker/build.sh`), and copy `build/picker.bin` to the drive as `_lil`. Run it with PlatformIO's Python, which has pyserial:
 `~/.platformio/penv/bin/python tools/lil.py flash zero`.
 
 Other ESP32-S3 boards with PSRAM build too (`platformio.ini`: `xiao`, the XIAO ESP32S3, 8 MB; `zero`, the Waveshare

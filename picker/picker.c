@@ -3,7 +3,7 @@
  * (the menu) */
 /* lilfm1buddy's picker: felucca-bsp's update loader (loader/loader.c, ldr_screen.c), with a menu in front.
  *
- * The ESP32 writes it to RAM through the boot ROM and jumps to it (esp32/rom.cpp): built in, or menu.ram on its
+ * The ESP32 writes it to RAM through the boot ROM and jumps to it (esp32/rom.cpp): built in, or _lil on its
  * drive. It's then a USB-MIDI device ("Felucca Update", 1209:0002) that answers M-UPGRADE as "ota-FM-1_900", as the
  * loader does, and speaks the ESP32's commands (esp32/main.cpp), a line in each SysEx: F0 7D 4C 42 TEXT F7. It asks
  * "info" (for the ESP32's battery) and "ls" (the firmwares and backups on its drive), once a second until both are

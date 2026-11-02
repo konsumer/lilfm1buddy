@@ -4,7 +4,7 @@
 //
 //   *.fwsc          firmwares (FM-1 packages)
 //   *.bin           backups of an FM-1's flash
-//   menu.ram        the menu on the FM-1's screen (picker/: run from its RAM), if it isn't the one built in
+//   _lil            the menu on the FM-1's screen (picker/: run from its RAM), if it isn't the one built in
 //   wl82loader.bin  JieLi's loader, for writing the FM-1's flash (the web page gets it)
 //   midimap.txt     MIDI routing on the FM-1 (fm1buddy's rules: midimap.h). A line "bluetooth" turns on Bluetooth
 //                   MIDI too, "bluetooth NAME" connects to a Bluetooth MIDI device of that name as well
@@ -20,7 +20,7 @@
 //   1. the FM-1 into its boot ROM: SysEx to its firmware (stock V15, Felucca-based ones). If that doesn't work, the
 //      board restarts into key mode (fm1buddy's key_s3.cpp), and the key does it as the FM-1 is switched on. The key
 //      needs the FM-1 straight on the port: no hub
-//   2. the menu (menu.ram, or the one built in) into its RAM, and a jump to it. Nothing is written to its flash:
+//   2. the menu (_lil, or the one built in) into its RAM, and a jump to it. Nothing is written to its flash:
 //      switching the FM-1 off and on brings its firmware back
 //   3. the menu asks for what it needs with the commands below, and for what's picked: "install NAME" (the FM-1
 //      back into its boot ROM, JieLi's loader, and the sectors from 0x4000 to the image's end that differ; its head,
@@ -38,7 +38,7 @@
 //   rm NAME            the file gone
 //   install NAME       (from the FM-1) that firmware or backup onto it; OK first, then it's done
 //   backup             (from the FM-1) its whole flash to backup-N.bin; OK first
-//   run NAME           (from the FM-1) a program (.ram) into its RAM, and a jump to it; OK first
+//   run NAME           (from the FM-1) a program into its RAM (like _lil), and a jump to it; OK first
 //   log                (serial) log.txt
 //   disk               (serial) the USB drive again
 #include <Arduino.h>
@@ -61,7 +61,7 @@
 #include "rom.h"
 
 #define MAP FS "/midimap.txt"
-#define MENU "menu.ram"
+#define MENU "_lil"
 #define FLASH_SIZE 0x100000u
 #define IDLE_MS 120000  // nothing to do for this long: sleep
 #define MENU_MS 600000  // (with the menu up: nothing picked)

@@ -7,6 +7,7 @@
 //   lilfm1.bin      the menu on the FM-1's screen (picker/: run from its RAM; the web page gets it)
 //   lilsmk.bin      the same for the SMK-37
 //   wl82loader.bin  JieLi's loader, for writing the FM-1's flash (the web page gets it)
+//   theme.txt       the menus' colors: one of fomajam's themes by name (BLACK, PURPLE, WHITE, ...)
 //   midimap.txt     MIDI routing on the FM-1 (fm1buddy's rules: midimap.h). A line "bluetooth" turns on Bluetooth
 //                   MIDI too, "bluetooth NAME" connects to a Bluetooth MIDI device of that name as well
 //   log.txt         what happened last time on the FM-1
@@ -33,7 +34,8 @@
 // each SysEx: F0 7D 4C 42 TEXT F7, answered the same way): the menu's, and any FM-1 firmware's that wants them. Each
 // answer ends with a line "OK" or "ERR why":
 //
-//   info               lilfm1buddy VERSION free=BYTES loader=0|1 battery=BARS (0..3, -1: it can't tell)
+//   info               lilfm1buddy VERSION free=BYTES loader=0|1 battery=BARS (0..3, -1: it can't tell), and
+//                      theme=NAME with a theme.txt
 //   ls                 NAME BYTES KIND, a line for each file on the drive (names up to 60 characters). KIND: what
 //                      it's for, fm1 or smk (a firmware, a backup), or - (anything else)
 //   read OFF LEN NAME  LEN bytes (up to 64) of a file from OFF, in hex
@@ -494,7 +496,13 @@ static void command(const char* line, int dev) {
   }
   if (!strcmp(cmd, "info")) {
     std::vector<uint8_t> l;
-    reply("lilfm1buddy " VERSION " free=%llu loader=%d battery=%d", disk::freeBytes(), !jieliLoader(l), batteryBars());
+    char theme[16] = "";
+    if (FILE* f = fopen(FS "/theme.txt", "r")) {
+      fscanf(f, "%15[A-Za-z0-9]", theme);
+      fclose(f);
+    }
+    reply("lilfm1buddy " VERSION " free=%llu loader=%d battery=%d%s%s", disk::freeBytes(), !jieliLoader(l),
+          batteryBars(), theme[0] ? " theme=" : "", theme);
   } else if (!strcmp(cmd, "ls")) {
     if (DIR* d = opendir(FS)) {
       while (dirent* e = readdir(d)) {

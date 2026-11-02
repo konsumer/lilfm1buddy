@@ -96,20 +96,31 @@ static void ldr_record_clear(void) { fm1_updata_parm_clear(); }
 #include "screen.c"
 
 /* ---- the menu ---- */
-#define PK_MAX 24u   /* rows: backing up, then files */
-#define PK_FILE 64u  /* a file's name, whole */
-#define PK_NAME 20u  /* a row's characters (scale 2: 12 px each) */
-#define PK_ROWS 8u   /* rows on screen */
-#define PK_ROW_H 22u
-#define PK_TOP 40u
+#define PK_MAX 24u  /* rows: backing up, then files */
+#define PK_FILE 64u /* a file's name, whole */
 #define PK_LINE 120u
+#define PK_HEAD 40u  /* the header's height */
+#define PK_TOP 46u   /* the list's top */
+#define PK_ROW_H 28u /* a row */
+#define PK_ROWS 6u   /* rows on screen */
+#define PK_FOOT 218u /* the hint's top */
+
+#if FOMA_SMK37
+#define PK_KIND " smk"
+#define PK_DEVICE "SMK-37"
+#define PK_SEL_ENC 1u /* its K2: SELECT on the FM-1 (fomajam's fm1.c) */
+#else
+#define PK_KIND " fm1"
+#define PK_DEVICE "FM-1"
+#define PK_SEL_ENC 0u
+#endif
+#define PK_RED RGB(255, 72, 72)
 
 static char pk_files[PK_MAX][PK_FILE + 1u]; /* row 0: "" (backing up) */
-static char pk_names[PK_MAX][PK_NAME + 1u];
-static uint32_t pk_n;           /* rows */
-static uint32_t pk_sel, pk_top; /* the highlighted row, the first on screen */
-static int32_t pk_batt_raw;     /* the FM-1's battery: smoothed ADC (0: not read yet) */
-static int32_t pk_fm1 = -1, pk_lil = -1; /* the batteries, 0..3 bars (-1: not known) */
+static uint32_t pk_n;                        /* rows */
+static uint32_t pk_sel, pk_top;              /* the highlighted row, the first on screen */
+static int32_t pk_batt_raw;                  /* the device's battery: smoothed ADC (0: not read yet) */
+static int32_t pk_dev = -1, pk_lil = -1;     /* the batteries, 0..3 bars (-1: not known) */
 
 /* what was asked of the ESP32, and is being answered */
 enum { PK_ASK_INFO, PK_ASK_LS, PK_ASKED_ALL };
@@ -129,16 +140,10 @@ static void pk_say(const char *a, const char *b)
   ota_wire_send(m, n);
 }
 
-#if FOMA_SMK37
-#define PK_KIND " smk"
-#else
-#define PK_KIND " fm1"
-#endif
-
 /* "NAME BYTES KIND" from ls: a row, if it's for this device (KIND fm1 or smk: a firmware, or a backup) */
 static void pk_file(const char *s)
 {
-  uint32_t n = str_len(s), k, spaces = 0;
+  uint32_t n = str_len(s), spaces = 0;
   if (n < 4u || !str_eq(s + n - 4u, PK_KIND) || pk_n >= PK_MAX)
     return;
   for (n -= 4u; n && spaces < 1u; n--) /* (the name: up to the space before BYTES) */
@@ -147,14 +152,21 @@ static void pk_file(const char *s)
     return;
   memcpy(pk_files[pk_n], s, n);
   pk_files[pk_n][n] = 0;
-  while (n && s[n - 1u] != '.')
-    n--;
-  for (k = 0; k < PK_NAME && k + 1u < n; k++) {
-    char c = s[k];
-    pk_names[pk_n][k] = c >= 'a' && c <= 'z' ? (char)(c - 32) : c;
-  }
-  pk_names[pk_n][k] = 0;
   pk_n++;
+}
+
+/* a theme by its name (theme.txt on the ESP32's drive, in its info), fomajam's first if it has none of that name */
+static void pk_theme(const char *s)
+{
+  int i, k;
+  for (i = 0; i < THEME_COUNT; i++) {
+    for (k = 0; THEMES[i].name[k] && (s[k] == THEMES[i].name[k] || s[k] == THEMES[i].name[k] + 32); k++)
+      ;
+    if (!THEMES[i].name[k] && (s[k] == ' ' || !s[k])) {
+      th = &THEMES[i];
+      return;
+    }
+  }
 }
 
 /* a line from the ESP32 (after F0 7D 4C 42): the answer to what was asked */
@@ -179,46 +191,19 @@ static void pk_line(const uint8_t *p, uint32_t n)
     str_cpy(pk_err, s + (n > 4u ? 4u : n), sizeof pk_err);
   else if (pk_asking == PK_ASK_INFO) {
     for (b = s; *b; b++)
-      if (!memcmp(b, "battery=", 8)) {
+      if (!memcmp(b, "battery=", 8))
         pk_lil = b[8] >= '0' && b[8] <= '3' ? b[8] - '0' : -1;
-        break;
-      }
+      else if (!memcmp(b, "theme=", 6))
+        pk_theme(b + 6);
   } else if (pk_asking == PK_ASK_LS)
     pk_file(s);
 }
 
-/* a battery: an outline and up to 3 bars, at x, y (24 x 9) */
-static void pk_cell(uint32_t x, uint32_t y, int32_t bars)
-{
-  uint16_t c = bars == 0 ? SCR_BAR : SCR_FG;
-  int32_t b;
-  scr_fill(x, y, 21, 9, c);
-  scr_fill(x + 1u, y + 1u, 19, 7, SCR_BG);
-  scr_fill(x + 21u, y + 2u, 2, 5, c);
-  for (b = 0; b < bars; b++)
-    scr_fill(x + 3u + (uint32_t)b * 6u, y + 2u, 4, 5, c);
-}
-
-/* both batteries, under the title */
-static void pk_batts(void)
-{
-  uint32_t w = pk_lil >= 0 ? 116u : 52u, x = (240u - w) / 2u;
-  scr_fill(0, 27, 240, 11, SCR_BG);
-  if (pk_fm1 < 0)
-    return;
-  scr_line(x, 28, "FM-1", 1, SCR_FG, SCR_BG);
-  pk_cell(x + 28u, 27, pk_fm1);
-  if (pk_lil >= 0) {
-    scr_line(x + 64u, 28, "BUDDY", 1, SCR_FG, SCR_BG);
-    pk_cell(x + 98u, 27, pk_lil);
-  }
-}
-
-/* the FM-1's battery, every second: Felucca's smoothing and bars (ui_draw.c) */
+/* the device's battery, every second: Felucca's smoothing and bars (ui_draw.c) */
 static int pk_batt_poll(uint32_t now)
 {
   static uint32_t last;
-  int32_t b, was = pk_fm1;
+  int32_t b, was = pk_dev;
   if (pk_batt_raw && now - last < 1000u)
     return 0;
   last = now;
@@ -226,63 +211,181 @@ static int pk_batt_poll(uint32_t now)
   if (b > 0)
     pk_batt_raw = pk_batt_raw ? pk_batt_raw + (b - pk_batt_raw) / 32 : b;
   if (pk_batt_raw)
-    pk_fm1 = pk_batt_raw >= 591 ? 3 : pk_batt_raw >= 561 ? 2 : pk_batt_raw >= 531 ? 1 : 0;
-  return pk_fm1 != was;
+    pk_dev = pk_batt_raw >= 591 ? 3 : pk_batt_raw >= 561 ? 2 : pk_batt_raw >= 531 ? 1 : 0;
+  return pk_dev != was;
 }
 
+/* a battery at x, y in the strip (22 x 12): an outline, and its bars (red when empty) */
+static void pk_cell(int32_t x, int32_t y, int32_t bars)
+{
+  uint16_t c = bars == 0 ? PK_RED : th->text;
+  int32_t b;
+  scr_rect(x, y, 20, 12, 2, c);
+  scr_rect(x + 2, y + 2, 16, 8, 0, th->panel);
+  scr_rect(x + 20, y + 3, 2, 6, 0, c);
+  for (b = 0; b < bars; b++)
+    scr_rect(x + 3 + b * 5, y + 3, 4, 6, 0, th->accent);
+}
+
+/* the header: the title, and both batteries (the device's, and lilfm1buddy's) */
+static void pk_header(void)
+{
+  int32_t x = 228;
+  scr_begin(240, PK_HEAD, th->panel);
+  scr_text(12, 12, &FONT_S, "lilfm1buddy", th->accent, th->panel, 120);
+  if (pk_lil >= 0) {
+    x -= 22;
+    pk_cell(x, 14, pk_lil);
+    x -= scr_text_w(&FONT_S, "LIL") + 4;
+    scr_text(x, 12, &FONT_S, "LIL", th->dim, th->panel, 40);
+    x -= 10;
+  }
+  if (pk_dev >= 0) {
+    x -= 22;
+    pk_cell(x, 14, pk_dev);
+    x -= scr_text_w(&FONT_S, PK_DEVICE) + 4;
+    scr_text(x, 12, &FONT_S, PK_DEVICE, th->dim, th->panel, 60);
+  }
+  scr_blit(0, 0);
+}
+
+/* a row's name: the file's, without its extension */
+static void pk_name(uint32_t r, char *out, uint32_t max)
+{
+  uint32_t n = 0, dot = 0;
+  if (!r) {
+    str_cpy(out, "Back up this " PK_DEVICE, max);
+    return;
+  }
+  for (; pk_files[r][n]; n++)
+    if (pk_files[r][n] == '.')
+      dot = n;
+  n = dot ? dot : n;
+  if (n >= max)
+    n = max - 1u;
+  memcpy(out, pk_files[r], n);
+  out[n] = 0;
+}
+
+/* row r of the list (on screen, or not drawn) */
 static void pk_row(uint32_t r)
 {
-  uint32_t y = PK_TOP + (r - pk_top) * PK_ROW_H, on = r == pk_sel;
-  scr_fill(0, y, 240, PK_ROW_H, on ? SCR_BAR : SCR_BG);
-  scr_line(8, y + 4u, pk_names[r], 2, on ? SCR_BG : SCR_FG, on ? SCR_BAR : SCR_BG);
+  char name[PK_FILE + 1u];
+  uint32_t on = r == pk_sel;
+  uint16_t fg = on ? th->text : r ? scr_mix(th->text, th->bg, 11) : th->accent, bg = on ? th->panel : th->bg;
+  if (r < pk_top || r >= pk_top + PK_ROWS)
+    return;
+  scr_begin(232, PK_ROW_H, th->bg);
+  if (on) {
+    scr_rect(4, 1, 224, PK_ROW_H - 2u, 6, th->panel);
+    scr_rect(4, 7, 3, PK_ROW_H - 14u, 1, th->accent);
+  }
+  pk_name(r, name, sizeof name);
+  scr_text(16, 6, &FONT_S, name, r ? fg : th->accent, bg, 200);
+  scr_blit(0, PK_TOP + (r - pk_top) * PK_ROW_H);
+}
+
+/* the scroll bar, at the right edge of the list */
+static void pk_scroll(void)
+{
+  uint32_t h = PK_ROWS * PK_ROW_H, len = pk_n > PK_ROWS ? h * PK_ROWS / pk_n : h;
+  uint32_t at = pk_n > PK_ROWS ? (h - len) * pk_top / (pk_n - PK_ROWS) : 0, y;
+  for (y = 0; y < h; y += SCR_H) {
+    scr_begin(4, h - y < SCR_H ? h - y : SCR_H, th->bg);
+    if (pk_n > PK_ROWS) {
+      scr_rect(1, 0, 2, (int32_t)scr_h, 0, th->panel);
+      scr_rect(0, (int32_t)at - (int32_t)y, 4, (int32_t)len, 2, th->dim);
+    }
+    scr_blit(234, PK_TOP + y);
+  }
 }
 
 static void pk_list(void)
 {
-  uint32_t r, rows = pk_n;
+  uint32_t r;
   if (pk_sel < pk_top)
     pk_top = pk_sel;
   if (pk_sel >= pk_top + PK_ROWS)
     pk_top = pk_sel - PK_ROWS + 1u;
-  scr_fill(0, PK_TOP, 240, PK_ROWS * PK_ROW_H, SCR_BG);
-  for (r = pk_top; r < rows && r < pk_top + PK_ROWS; r++)
-    pk_row(r);
+  for (r = pk_top; r < pk_top + PK_ROWS; r++)
+    if (r < pk_n)
+      pk_row(r);
+    else
+      scr_fill(0, PK_TOP + (r - pk_top) * PK_ROW_H, 232, PK_ROW_H, th->bg);
+  pk_scroll();
 }
 
-static void pk_screen(const char *title, const char *a, const char *b)
+/* the hint at the bottom */
+static void pk_hint(const char *s)
 {
-  scr_fill(0, 0, 240, 240, SCR_BG);
-  scr_center(10, title, 2, SCR_FG);
-  pk_batts();
-  if (a)
-    scr_center(96, a, 2, SCR_FG);
-  if (b)
-    scr_center(130, b, 1, SCR_FG);
+  scr_begin(240, 22, th->bg);
+  scr_center(3, &FONT_S, s, th->dim, th->bg);
+  scr_blit(0, PK_FOOT);
+}
+
+/* a whole screen: the header, a big title, two lines (0 for none; b in bc), and a hint */
+static void pk_screen(const char *title, uint16_t tc, const char *a, const char *b, uint16_t bc, const char *hint)
+{
+  scr_fill(0, PK_HEAD, 240, 240u - PK_HEAD, th->bg);
+  pk_header();
+  scr_begin(240, 32, th->bg);
+  scr_center(0, &FONT_L, title, tc, th->bg);
+  scr_blit(0, 76);
+  if (a) {
+    scr_begin(240, 20, th->bg);
+    scr_center(2, &FONT_S, a, th->text, th->bg);
+    scr_blit(0, 124);
+  }
+  if (b) {
+    scr_begin(240, 20, th->bg);
+    scr_center(2, &FONT_S, b, bc, th->bg);
+    scr_blit(0, 148);
+  }
+  if (hint)
+    pk_hint(hint);
+}
+
+/* an error, a line or two of it */
+static void pk_error(const char *e)
+{
+  char l1[32], l2[32];
+  uint32_t n = str_len(e), cut = n;
+  if (n > 28u) { /* (at the last space that fits) */
+    for (cut = 28u; cut && e[cut] != ' '; cut--)
+      ;
+    if (!cut)
+      cut = 28u;
+  }
+  str_cpy(l1, e, cut + 1u < sizeof l1 ? cut + 1u : sizeof l1);
+  str_cpy(l2, e + cut + (e[cut] == ' '), sizeof l2);
+  pk_screen("OOPS", PK_RED, l1, l2[0] ? l2 : 0, th->text, "OCT+: BACK");
 }
 
 static void pk_menu(void)
 {
-  pk_screen("PICK ONE", 0, 0);
-  scr_center(222, "KNOB: MOVE   BUTTON: PICK", 1, SCR_FG);
+  scr_fill(0, PK_HEAD, 240, 240u - PK_HEAD, th->bg);
+  pk_header();
   pk_list();
+  pk_hint("SEL: MOVE    OCT+: OK");
 }
 
-/* what the keys and knobs did since last time: steps (any knob), a button pressed, a piano key pressed (-1: none) */
-static void pk_input(int32_t *steps, uint32_t *button, int32_t *key)
+/* the SEL knob's steps, OCT+, and anything else touched, since last time */
+static void pk_input(int32_t *steps, uint32_t *ok, uint32_t *other)
 {
-  uint32_t e, notes;
+  uint32_t e, b;
   fm1_input_scan();
   *steps = 0;
-  for (e = 0; e < FM1_NENC; e++)
-    *steps += fm1_enc_take(e);
-  *button = fm1_input_edges(0);
-  notes = fm1_input_note_edges();
-  *key = -1;
-  for (e = 0; e < 27u; e++)
-    if (notes & (1u << e)) {
-      *key = (int32_t)e;
-      break;
-    }
+  *other = 0;
+  for (e = 0; e < FM1_NENC; e++) {
+    int32_t k = fm1_enc_take(e);
+    if (e == PK_SEL_ENC)
+      *steps = k;
+    else
+      *other |= k != 0;
+  }
+  b = fm1_input_edges(0);
+  *ok = b >> FM1_BTN_OCT_UP & 1u;
+  *other |= (b & ~(1u << FM1_BTN_OCT_UP)) != 0 || fm1_input_note_edges() != 0;
 }
 
 /* the picked row, to the ESP32: install it, or back up (once a second, until the boot ROM's key comes) */
@@ -294,24 +397,27 @@ static void pk_do(void)
     pk_say("backup", 0);
 }
 
-enum { PK_WAIT, PK_MENU, PK_SURE, PK_ASKED };
+enum { PK_WAIT, PK_MENU, PK_SURE, PK_ASKED, PK_ERROR };
+
+static void pk_sure(void)
+{
+  char name[PK_FILE + 1u];
+  pk_name(pk_sel, name, sizeof name);
+  pk_screen(pk_sel ? "INSTALL?" : "BACK UP?", th->accent, pk_sel ? name : "All of its flash, to a file",
+            pk_dev == 0 ? "Low battery: charge it first" : 0, PK_RED, "OCT+: YES    ELSE: NO");
+}
 
 static void pk_main(void)
 {
-  uint32_t state = PK_WAIT, said = 0, button;
-  int32_t shown_lil = -1;
-  int32_t steps, key;
+  uint32_t state = PK_WAIT, said = 0, ok, other;
+  int32_t shown_lil = -1, steps;
+  const theme_t *shown_th = th;
   fm1_wdt_arm(0x0D); /* ~8 s, fed by ldr_poll */
   fm1_time_init();
   scr_init();
   fm1_input_init();
   fm1_adc_init();
-  #if FOMA_SMK37
-  str_cpy(pk_names[0], "BACK UP THIS SMK-37", sizeof pk_names[0]);
-#else
-  str_cpy(pk_names[0], "BACK UP THIS FM-1", sizeof pk_names[0]);
-#endif
-  pk_screen("LILFM1BUDDY", "WAITING FOR", "THE LIST");
+  pk_screen("LILFM1BUDDY", th->accent, 0, "Asking for the list..", th->dim, 0);
   usb_start();
   for (;;) {
     const uint8_t *p;
@@ -328,13 +434,17 @@ static void pk_main(void)
       ota_frame_done();
       said = now; /* (it's answering: asked again only once it's quiet for a second) */
     }
-    ota_service(); /* handshake: who it is */
+    ota_service();   /* handshake: who it is */
     usb.ota_req = 0; /* (M-UPGRADE: not here) */
+    if (th != shown_th) { /* (its theme came) */
+      shown_th = th;
+      scr_fill(0, 0, 240, 240, th->bg);
+      pk_screen("LILFM1BUDDY", th->accent, 0, "Asking for the list..", th->dim, 0);
+    }
     if (pk_err[0]) {
-      pk_screen("BUDDY SAYS", 0, pk_err);
+      pk_error(pk_err);
       pk_err[0] = 0;
-      if (state == PK_ASKED)
-        state = PK_SURE; /* (button: again) */
+      state = PK_ERROR;
     }
     if (state == PK_WAIT && pk_asking == PK_ASKED_ALL) {
       state = PK_MENU;
@@ -351,40 +461,49 @@ static void pk_main(void)
     }
     if (pk_batt_poll(now) | (pk_lil != shown_lil)) {
       shown_lil = pk_lil;
-      pk_batts();
+      pk_header();
     }
-    pk_input(&steps, &button, &key);
+    pk_input(&steps, &ok, &other);
     if (state == PK_MENU) {
-      uint32_t was = pk_sel, rows = pk_n;
-      if (key >= 0 && (uint32_t)key < rows)
-        pk_sel = (uint32_t)key;
-      else if (steps > 0)
-        pk_sel = pk_sel + (uint32_t)steps >= rows ? rows - 1u : pk_sel + (uint32_t)steps;
-      else if (steps < 0)
-        pk_sel = (uint32_t)-steps > pk_sel ? 0 : pk_sel - (uint32_t)-steps;
+      uint32_t was = pk_sel, top = pk_top;
+      if (steps > 0)
+        pk_sel = pk_sel + 1u >= pk_n ? pk_n - 1u : pk_sel + 1u;
+      else if (steps < 0 && pk_sel)
+        pk_sel--;
       if (pk_sel != was) {
-        if (pk_sel >= pk_top && pk_sel < pk_top + PK_ROWS && was >= pk_top && was < pk_top + PK_ROWS) {
+        if (pk_sel < pk_top)
+          pk_top = pk_sel;
+        if (pk_sel >= pk_top + PK_ROWS)
+          pk_top = pk_sel - PK_ROWS + 1u;
+        if (pk_top != top)
+          pk_list();
+        else {
           pk_row(was);
           pk_row(pk_sel);
-        } else
-          pk_list();
+        }
       }
-      if (button) {
+      if (ok) {
         state = PK_SURE;
-        pk_screen(pk_sel ? "INSTALL" : "BACK UP", pk_sel ? pk_names[pk_sel] : "ALL OF ITS FLASH", "BUTTON: YES   KNOB: NO");
-        if (pk_fm1 == 0)
-          scr_center(160, "LOW BATTERY: CHARGE THE FM-1 FIRST", 1, SCR_BAR);
+        pk_sure();
       }
     } else if (state == PK_SURE) {
-      if (button) {
+      if (ok) {
+        char name[PK_FILE + 1u];
         state = PK_ASKED;
         said = now;
         pk_do();
-        pk_screen(pk_sel ? "INSTALLING" : "BACKING UP", pk_names[pk_sel], "DO NOT UNPLUG");
-      } else if (steps || key >= 0) {
+        pk_name(pk_sel, name, sizeof name);
+        pk_screen(pk_sel ? "INSTALLING" : "BACKING UP", th->accent, pk_sel ? name : 0, "Don't unplug it", th->dim, 0);
+      } else if (steps || other) {
         state = PK_MENU;
         pk_menu();
       }
+    } else if (state == PK_ERROR && (ok || steps)) {
+      state = pk_asking == PK_ASKED_ALL ? PK_MENU : PK_WAIT;
+      if (state == PK_MENU)
+        pk_menu();
+      else
+        pk_screen("LILFM1BUDDY", th->accent, 0, "Asking for the list..", th->dim, 0);
     }
   }
 }

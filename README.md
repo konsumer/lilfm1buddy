@@ -38,6 +38,8 @@ and macOS is told not to make most of them. On the drive:
 - `lilfm1.bin`, `lilsmk.bin`: the menus on the FM-1's and the SMK-37's screens (`picker/`, run from their RAM), for
   the devices you have: the web page puts the latest there, so the board itself rarely needs updating. The board asks
   the running firmware which it is, and loads its menu
+- `theme.txt`: the menus' colors, one of [fomajam](https://github.com/konsumer/fomajam)'s themes by name: `BLACK` (the
+  default), `GREY`, `BLUE`, `GREEN`, `FOREST`, `PURPLE`, `RED`, `ORANGE`, `TEAL`, `WHITE` or `NEON`
 - `midimap.txt`: MIDI routing on the FM-1, with [fm1buddy](https://github.com/konsumer/fm1buddy)'s rules (none: no
   routing). A line `bluetooth` turns on Bluetooth MIDI (phones and computers connect to it, as `fm1buddy`), and
   `bluetooth NAME` connects to a Bluetooth MIDI device whose name has NAME in it
@@ -50,9 +52,9 @@ On the FM-1:
 2. Press BOOT. With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by
    itself. With any other (SLOOP, ...), or none, the LED blinks yellow: switch the FM-1 off, then on (straight on the
    board for this: no hub).
-3. The FM-1 shows the list, and both batteries at the top: "Back up this FM-1", then the firmwares and backups. Turn
-   any knob to move, press any button to pick (and again to be sure), or a piano key to jump to its row. To keep
-   what's on it, switch the FM-1 off and on.
+3. The FM-1 shows the list, and both batteries at the top: "Back up this FM-1", then its firmwares and backups. Turn
+   SEL to move, press OCT+ to pick, and OCT+ again to be sure (anything else: back). To keep what's on it, switch the
+   FM-1 off and on.
 4. The board writes it (magenta), or backs it up to `fm1-N.bin` (white), and the FM-1 starts: the LED green. Three
    red blips and a pause: it didn't (`log.txt` says why). Then the board goes to sleep.
 

@@ -23,7 +23,7 @@ run() {  # TOOL ARGS... (paths relative to ROOT)
 }
 
 CC="pi32v2/bin/clang"
-FLAGS="-target pi32v2 -Os -ffunction-sections -fno-builtin -Wall -Wno-unused-function -Ipicker -I$P/hal -I$P/src -I$P/loader"
+FLAGS="-target pi32v2 -Os -ffunction-sections -fno-builtin -Wall -Wno-unused-function -Ipicker -I$P/hal -I$P/src -I$P/loader -I$P/gen -Ithird_party/fomajam/src"
 run $CC -target pi32v2 -c $P/loader/crt0_ldr.S -o $OUT/crt0_ldr.o
 for m in fm1:0 smk:1; do
   name=lil${m%:*}

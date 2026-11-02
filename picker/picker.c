@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments; Charles Vestal (the screen); David Konsumer
  * (the menu) */
-/* lilfm1buddy's picker: felucca-bsp's update loader (loader/loader.c, ldr_screen.c), with a menu in front.
+/* lilfm1buddy's menu: fomajam's update loader (platform/loader: felucca-bsp's, with fomajam's platform for each
+ * device), with a menu in front. Built for the FM-1 (lilfm1.bin) and, with FOMA_SMK37, the SMK-37 (lilsmk.bin: its
+ * screen, and its keys, buttons and knobs through smk_input.h, which keeps fm1_input.h's calls).
  *
  * The ESP32 writes it to RAM through the boot ROM and jumps to it (esp32/rom.cpp): built in, or lilfm1.bin on
  * its drive. It's then a USB-MIDI device ("Felucca Update", 1209:0002) that answers M-UPGRADE as "ota-FM-1_900", as the
@@ -22,7 +24,11 @@
 #define FELUCCA_OTA 1
 #define FELUCCA_OTA_DRYRUN 0
 #define FELUCCA_USB_PID 0x0002
+#if FOMA_SMK37
+#define FELUCCA_ID "ota-SMK-37 Pro_900" /* (who it is, to the ESP32: an SMK-37, any of its names) */
+#else
 #define FELUCCA_ID "ota-FM-1_900"
+#endif
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
 #include "fm1_time.h"
 #include "fm1_sys.h"
@@ -31,7 +37,12 @@
 #include "fm1_flash.h"
 static void ldr_poll(void);
 #define FM1_INPUT_IDLE() ldr_poll()
+#if FOMA_SMK37
+#include "smk_input.h" /* the SMK-37's keys, buttons, knobs (and its battery) */
+#else
 #include "fm1_input.h"
+#include "fm1_adc.h"
+#endif
 #include "libc.c"
 #include "usb.c"
 
@@ -118,11 +129,17 @@ static void pk_say(const char *a, const char *b)
   ota_wire_send(m, n);
 }
 
-/* "NAME BYTES KIND" from ls: a row, if it's for the FM-1 (KIND fm1: a firmware, or a backup) */
+#if FOMA_SMK37
+#define PK_KIND " smk"
+#else
+#define PK_KIND " fm1"
+#endif
+
+/* "NAME BYTES KIND" from ls: a row, if it's for this device (KIND fm1 or smk: a firmware, or a backup) */
 static void pk_file(const char *s)
 {
   uint32_t n = str_len(s), k, spaces = 0;
-  if (n < 4u || !str_eq(s + n - 4u, " fm1") || pk_n >= PK_MAX)
+  if (n < 4u || !str_eq(s + n - 4u, PK_KIND) || pk_n >= PK_MAX)
     return;
   for (n -= 4u; n && spaces < 1u; n--) /* (the name: up to the space before BYTES) */
     spaces += s[n - 1u] == ' ';
@@ -289,7 +306,11 @@ static void pk_main(void)
   scr_init();
   fm1_input_init();
   fm1_adc_init();
+  #if FOMA_SMK37
+  str_cpy(pk_names[0], "BACK UP THIS SMK-37", sizeof pk_names[0]);
+#else
   str_cpy(pk_names[0], "BACK UP THIS FM-1", sizeof pk_names[0]);
+#endif
   pk_screen("LILFM1BUDDY", "WAITING FOR", "THE LIST");
   usb_start();
   for (;;) {

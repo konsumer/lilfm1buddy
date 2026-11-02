@@ -35,11 +35,9 @@ and macOS is told not to make most of them. On the drive:
   which it installs and backs up too). Each only goes onto its own kind: never an FM-1's onto an SMK-37, nor the other
   way round, and an SMK-37's own calibration is never written
 - `wl82loader.bin`: JieLi's loader, for writing the FM-1's flash
-- `lilfm1.bin`: the menu on the FM-1's screen (`picker/`, run from its RAM), if it isn't the one built into the board:
-  the web page puts the latest there, so the board itself rarely needs updating
-- `lilsmk.bin`: the same for the SMK-37, whose screen and keys aren't known yet: none so far. The board asks the
-  running firmware which it is and loads its menu. The FM-1's menu on an SMK-37 does nothing useful (lights, its
-  screen stuck): switch it off and on
+- `lilfm1.bin`, `lilsmk.bin`: the menus on the FM-1's and the SMK-37's screens (`picker/`, run from their RAM), if
+  they aren't the ones built into the board: the web page puts the latest there, so the board itself rarely needs
+  updating. The board asks the running firmware which it is, and loads its menu
 - `midimap.txt`: MIDI routing on the FM-1, with [fm1buddy](https://github.com/konsumer/fm1buddy)'s rules (none: no
   routing). A line `bluetooth` turns on Bluetooth MIDI (phones and computers connect to it, as `fm1buddy`), and
   `bluetooth NAME` connects to a Bluetooth MIDI device whose name has NAME in it
@@ -69,9 +67,9 @@ device (`4C4A:8057`) that takes commands, among them "write this to RAM" and "ju
 
 1. The ESP32 gets the FM-1 into its boot ROM: SysEx `F0 22 24 35 7D F7` from a firmware that takes it, or the USB key
    at power-on (fm1buddy's `key_s3.cpp`, after FM-1-transporter).
-2. It asks the running firmware which it is (an FM-1 or an SMK-37), and writes that one's **menu** (`lilfm1.bin` on its
-   drive, or the one built in: `picker/`; `lilsmk.bin`, the SMK-37's: none yet) to the FM-1's RAM and jumps to
-   it. Nothing is written to flash.
+2. It asks the running firmware which it is (an FM-1 or an SMK-37), and writes that one's **menu** (`lilfm1.bin` or
+   `lilsmk.bin` on its drive, or the one built in: `picker/`) to its RAM and jumps to it. Nothing is written to
+   flash.
 3. The menu starts the FM-1's screen, keys and USB (as a USB-MIDI device), and asks the ESP32 for what it needs with
    its commands, a line of text in each SysEx (`esp32/main.cpp` lists them: `info`, `ls`, `read`, `install`,
    `backup`, `run`, ...). The same commands work on the ESP32's serial port, and from any FM-1 firmware: one could
@@ -80,8 +78,10 @@ device (`4C4A:8057`) that takes commands, among them "write this to RAM" and "ju
    `wl82loader.bin` there, and writes the sectors of that firmware's flash image that differ, as fm1buddy's recovery
    does. A backup is the same, read instead.
 
-The menu is [felucca-bsp](https://github.com/hugelton/felucca-bsp)'s update loader (it runs from RAM) with a menu in
-front, and its screen and key scan. felucca's loader can't write the flash itself here: its flash driver wants the
+The menu is [fomajam](https://github.com/konsumer/fomajam)'s update loader (it runs from RAM; from
+[felucca-bsp](https://github.com/hugelton/felucca-bsp)'s) with a menu in front, built on fomajam's platform for each
+device (`third_party/fomajam/platform`: the FM-1's, and the SMK-37's screen, keys and knobs). The loader can't write
+the flash itself here: its flash driver wants the
 flash as the firmware's startup leaves it, and the boot ROM doesn't. If it learns to, the menu could write firmwares
 itself (reading them with `read`), with no change to the ESP32.
 
@@ -92,12 +92,12 @@ written now and then, so none of the flash goes to that).
 
 ## Build
 
-The picker needs JieLi's Linux toolchain (Felucca's `tools/get_toolchain.sh` fetches it) and, on macOS, Docker. The
-board's program has the picker in it:
+The menus need JieLi's Linux toolchain (Felucca's `tools/get_toolchain.sh` fetches it) and, on macOS, Docker. The
+board's program has them in it:
 
 ```sh
 git submodule update --init
-JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/picker.bin
+JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/lilfm1.bin, build/lilsmk.bin
 pio run -e xiaoplus -t upload                        # the board
 npm run fmt                                          # the web page's formatting
 ```
@@ -105,7 +105,7 @@ npm run fmt                                          # the web page's formatting
 `tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`
 (mounts its drive, prints where), `eject` (its serial port), `flash ENV` (installs the program, then it's the drive
 again), and any of its commands (`info`, `ls`, `log`, `read OFF LEN NAME`, `rm NAME`). A new menu: build it
-(`picker/build.sh`), and copy `build/picker.bin` to the drive as `lilfm1.bin`. Run it with PlatformIO's Python, which has pyserial:
+(`picker/build.sh`), and copy `build/lilfm1.bin` (or `lilsmk.bin`) to the drive. Run it with PlatformIO's Python, which has pyserial:
 `~/.platformio/penv/bin/python tools/lil.py flash zero`.
 
 Other ESP32-S3 boards with PSRAM build too (`platformio.ini`: `xiao`, the XIAO ESP32S3, 8 MB; `zero`, the Waveshare
@@ -122,7 +122,11 @@ it.
 ## Credits
 
 - [felucca-bsp](https://github.com/hugelton/felucca-bsp) (Leo Kuroshita, Charles Vestal, and others; MPL-2.0): the
-  FM-1's chip and board code, and the update loader the picker is built from. Files from it stay MPL-2.0.
+  FM-1's chip and board code, and the update loader the menus are built from (by way of fomajam). Files from it stay
+  MPL-2.0.
+- [fomajam](https://github.com/konsumer/fomajam) (GPL-3.0): the platform the menus are built on, with the SMK-37's
+  layer by M. Geisler ([genkigenki/Felucca](https://github.com/genkigenki/Felucca), branch smk37; hardware notes:
+  [genkigenki/fm1-to-smk37](https://github.com/genkigenki/fm1-to-smk37)).
 - [FM-1-transporter](https://github.com/kurogedelic/FM-1-transporter) (kurogedelic, MIT) and
   [jl-uboot-tool](https://github.com/kagaimiq/jl-uboot-tool) (kagaimiq, MIT): the boot ROM protocol and the key.
   JieLi's `wl82loader.bin` isn't included: the page fetches it from jl-uboot-tool.

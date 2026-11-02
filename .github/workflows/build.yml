@@ -41,7 +41,7 @@ jobs:
       - name: the page, with the program
         run: |
           version="$(git describe --tags --always)"
-          mkdir -p site/fw && cp build/picker.bin site/fw/lilfm1.bin  # (the FM-1's menu, for the page to put on a board's drive)
+          mkdir -p site/fw && cp build/lilfm1.bin build/lilsmk.bin site/fw/  # (the menus, for the page to put on a drive)
           for b in xiaoplus xiao zero devkit; do
             mkdir -p site/fw/$b
             cp .pio/build/$b/firmware.factory.bin site/fw/$b/lilfm1buddy.bin
@@ -53,7 +53,8 @@ jobs:
           name: firmware
           path: |
             site/fw/
-            build/picker.bin
+            build/lilfm1.bin
+            build/lilsmk.bin
           if-no-files-found: error
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main'

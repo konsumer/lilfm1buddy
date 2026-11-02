@@ -9,7 +9,7 @@
 
 #define ROM_VID 0x4C4A
 #define ROM_PID 0x8057
-#define PICKER_AT 0x01C0A800u  // felucca-bsp's loader.ld
+#define PICKER_AT 0x01C0A800u  // the menus', fomajam's platform/loader/loader.ld
 #define PICKER_MAX 0x14000u
 #define LOADER_AT 0x01C02000u  // JieLi's wl82loader.bin
 #define LOADER_SIZE 24064u

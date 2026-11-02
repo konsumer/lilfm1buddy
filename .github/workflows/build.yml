@@ -41,6 +41,7 @@ jobs:
       - name: the page, with the program
         run: |
           version="$(git describe --tags --always)"
+          mkdir -p site/fw && cp build/picker.bin site/fw/menu.ram  # (the menu, for the page to put on a board's drive)
           for b in xiaoplus xiao zero devkit; do
             mkdir -p site/fw/$b
             cp .pio/build/$b/firmware.factory.bin site/fw/$b/lilfm1buddy.bin

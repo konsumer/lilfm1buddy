@@ -5,10 +5,8 @@
 #
 #   tools/lil.py disk          the drive: prints where it's mounted
 #   tools/lil.py eject         the serial port (the drive ejected)
-#   tools/lil.py info          lilfm1buddy VERSION free=BYTES loader=0|1
-#   tools/lil.py ls            the files on the drive, and their sizes
-#   tools/lil.py log           log.txt: what happened last time on the FM-1
 #   tools/lil.py flash ENV     build and install the program (platformio.ini's ENV: zero, xiao, ...), then the drive
+#   tools/lil.py COMMAND ...   any of its commands (esp32/main.cpp): info, ls, log, read OFF LEN NAME, rm NAME
 #
 # Needs pyserial (PlatformIO has it: ~/.platformio/penv/bin/python tools/lil.py ...). The port: $PORT, or the first
 # /dev/cu.usbmodem* or /dev/ttyACM*. macOS or Linux.
@@ -99,7 +97,7 @@ def flash(env):
 
 def main():
     a = sys.argv[1:]
-    if not a or a[0] not in ('disk', 'eject', 'info', 'ls', 'log', 'flash') or (a[0] == 'flash' and len(a) < 2):
+    if not a or (a[0] == 'flash' and len(a) < 2):
         sys.exit(__doc__ or open(__file__).read().split('import')[0])
     if a[0] == 'disk':
         print(disk())
@@ -109,7 +107,7 @@ def main():
     elif a[0] == 'flash':
         print(flash(a[1]))
     else:
-        print('\n'.join(command(a[0])))
+        print('\n'.join(command(' '.join(a))))
 
 
 if __name__ == '__main__':

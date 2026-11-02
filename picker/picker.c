@@ -3,18 +3,16 @@
  * (the menu) */
 /* lilfm1buddy's picker: felucca-bsp's update loader (loader/loader.c, ldr_screen.c), with a menu in front.
  *
- * The ESP32 writes it to RAM through the boot ROM and jumps to it (esp32/rom.cpp). It's then a USB-MIDI device
- * ("Felucca Update", 1209:0002) that answers M-UPGRADE as "ota-FM-1_900", as the loader does, and:
- *
- *   picker -> ESP32  F0 7D 4C 42 10 F7          hello: send the list (once a second until it has all of it)
- *   ESP32 -> picker  F0 7D 4C 42 01 i n NAME F7  firmware i of n (NAME: ASCII, 7-bit)
- *   picker -> ESP32  F0 7D 4C 42 12 i F7        install firmware i (once a second, until the ESP32 sends the boot
- *                                               ROM's key: F0 22 24 35 7D F7)
- *   ESP32 -> picker  F0 7D 4C 42 02 L F7        its own battery: L 0..3 bars (it doesn't send it if it can't tell)
+ * The ESP32 writes it to RAM through the boot ROM and jumps to it (esp32/rom.cpp): built in, or menu.ram on its
+ * drive. It's then a USB-MIDI device ("Felucca Update", 1209:0002) that answers M-UPGRADE as "ota-FM-1_900", as the
+ * loader does, and speaks the ESP32's commands (esp32/main.cpp), a line in each SysEx: F0 7D 4C 42 TEXT F7. It asks
+ * "info" (for the ESP32's battery) and "ls" (the firmwares and backups on its drive), once a second until both are
+ * answered; then, for the row picked, "install NAME" or "backup" (once a second, until the ESP32 sends the boot ROM's
+ * key, F0 22 24 35 7D F7, and does it).
  *
  * Its header shows both batteries: the FM-1's (its ADC, in Felucca's bars) and the ESP32's.
  *
- * Then the ESP32 writes it through the boot ROM and JieLi's loader, as fm1buddy's recovery does: the flash driver
+ * The ESP32 then writes it through the boot ROM and JieLi's loader, as fm1buddy's recovery does: the flash driver
  * here (fm1_flash.h) wants the flash as the SPL leaves it, and the boot ROM doesn't. Nothing is written until one is
  * picked: switching the FM-1 off and on keeps what's on it. Any knob moves, any button picks (and again to be
  * sure), a piano key jumps to its row. Runs from RAM with interrupts off: USB is polled. Single compilation unit. */
@@ -87,61 +85,103 @@ static void ldr_record_clear(void) { fm1_updata_parm_clear(); }
 #include "screen.c"
 
 /* ---- the menu ---- */
-#define PK_MAX 24u   /* firmwares */
+#define PK_MAX 24u   /* rows: backing up, then files */
+#define PK_FILE 64u  /* a file's name, whole */
 #define PK_NAME 20u  /* a row's characters (scale 2: 12 px each) */
 #define PK_ROWS 8u   /* rows on screen */
 #define PK_ROW_H 22u
 #define PK_TOP 40u
+#define PK_LINE 120u
 
+static char pk_files[PK_MAX][PK_FILE + 1u]; /* row 0: "" (backing up) */
 static char pk_names[PK_MAX][PK_NAME + 1u];
-static uint8_t pk_have[PK_MAX];
-static uint32_t pk_n;          /* firmwares, as the ESP32 said (0: no list yet) */
+static uint32_t pk_n;           /* rows */
 static uint32_t pk_sel, pk_top; /* the highlighted row, the first on screen */
 static int32_t pk_batt_raw;     /* the FM-1's battery: smoothed ADC (0: not read yet) */
 static int32_t pk_fm1 = -1, pk_lil = -1; /* the batteries, 0..3 bars (-1: not known) */
 
-static void pk_send(uint8_t cmd, int32_t arg)
+/* what was asked of the ESP32, and is being answered */
+enum { PK_ASK_INFO, PK_ASK_LS, PK_ASKED_ALL };
+static uint32_t pk_asking;
+static char pk_err[PK_LINE + 1u];
+
+/* a line to the ESP32: F0 7D 4C 42 TEXT F7 */
+static void pk_say(const char *a, const char *b)
 {
-  uint8_t m[7] = {0xF0, 0x7D, 0x4C, 0x42, cmd, 0, 0xF7};
-  if (arg < 0) {
-    m[5] = 0xF7;
-    ota_wire_send(m, 6);
-  } else {
-    m[5] = (uint8_t)arg;
-    ota_wire_send(m, 7);
-  }
+  uint8_t m[4u + PK_LINE + 1u] = {0xF0, 0x7D, 0x4C, 0x42};
+  uint32_t n = 4;
+  for (; *a && n < 4u + PK_LINE; a++)
+    m[n++] = (uint8_t)*a;
+  for (; b && *b && n < 4u + PK_LINE; b++)
+    m[n++] = (uint8_t)*b;
+  m[n++] = 0xF7;
+  ota_wire_send(m, n);
 }
 
-static int pk_complete(void)
+static int pk_ends(const char *s, uint32_t n, const char *e)
 {
-  uint32_t i;
-  if (!pk_n)
+  uint32_t k = str_len(e), i;
+  if (n <= k)
     return 0;
-  for (i = 0; i < pk_n; i++)
-    if (!pk_have[i])
+  for (i = 0; i < k; i++) {
+    char c = s[n - k + i];
+    if ((c >= 'A' && c <= 'Z' ? c + 32 : c) != e[i])
       return 0;
+  }
   return 1;
 }
 
-/* one of ours (the bytes after F0 7D 4C 42), from the ESP32 */
-static void pk_frame(const uint8_t *p, uint32_t n)
+/* "NAME BYTES" from ls: a row, if it's a firmware (.fwsc) or a backup (.bin) */
+static void pk_file(const char *s)
 {
-  uint32_t i, k;
-  if (n >= 3u && p[0] == 0x01 && p[1] < PK_MAX && p[2] && p[2] <= PK_MAX) {
-    i = p[1];
-    if (pk_n != p[2]) { /* a new list */
-      pk_n = p[2];
-      for (k = 0; k < PK_MAX; k++)
-        pk_have[k] = 0;
-    }
-    for (k = 0; k < PK_NAME && 3u + k < n; k++) {
-      char c = (char)p[3u + k];
-      pk_names[i][k] = c >= 'a' && c <= 'z' ? (char)(c - 32) : c;
-    }
-    pk_names[i][k] = 0;
-    pk_have[i] = 1;
-  } else if (n >= 2u && p[0] == 0x02 && p[1] <= 3u)
-    pk_lil = p[1];
+  uint32_t n = str_len(s), k;
+  while (n && s[n - 1u] != ' ')
+    n--;
+  if (n)
+    n--; /* (the name: up to the last space) */
+  if (!n || n > PK_FILE || pk_n >= PK_MAX || s[0] == '.' || !(pk_ends(s, n, ".fwsc") || pk_ends(s, n, ".bin")) ||
+      (n == 14u && !memcmp(s, "wl82loader.bin", 14)))
+    return;
+  memcpy(pk_files[pk_n], s, n);
+  pk_files[pk_n][n] = 0;
+  while (n && s[n - 1u] != '.')
+    n--;
+  for (k = 0; k < PK_NAME && k + 1u < n; k++) {
+    char c = s[k];
+    pk_names[pk_n][k] = c >= 'a' && c <= 'z' ? (char)(c - 32) : c;
+  }
+  pk_names[pk_n][k] = 0;
+  pk_n++;
+}
+
+/* a line from the ESP32 (after F0 7D 4C 42): the answer to what was asked */
+static void pk_line(const uint8_t *p, uint32_t n)
+{
+  char s[PK_LINE + 1u];
+  uint32_t i;
+  const char *b;
+  if (n > PK_LINE)
+    n = PK_LINE;
+  for (i = 0; i < n; i++)
+    s[i] = (char)p[i];
+  s[n] = 0;
+  if (str_eq(s, "OK")) {
+    if (pk_asking == PK_ASK_INFO) {
+      pk_asking = PK_ASK_LS;
+      pk_n = 1; /* (row 0: backing up) */
+      pk_say("ls", 0);
+    } else if (pk_asking == PK_ASK_LS)
+      pk_asking = PK_ASKED_ALL;
+  } else if (s[0] == 'E' && s[1] == 'R' && s[2] == 'R')
+    str_cpy(pk_err, s + (n > 4u ? 4u : n), sizeof pk_err);
+  else if (pk_asking == PK_ASK_INFO) {
+    for (b = s; *b; b++)
+      if (!memcmp(b, "battery=", 8)) {
+        pk_lil = b[8] >= '0' && b[8] <= '3' ? b[8] - '0' : -1;
+        break;
+      }
+  } else if (pk_asking == PK_ASK_LS)
+    pk_file(s);
 }
 
 /* a battery: an outline and up to 3 bars, at x, y (24 x 9) */
@@ -219,7 +259,7 @@ static void pk_screen(const char *title, const char *a, const char *b)
 
 static void pk_menu(void)
 {
-  pk_screen("PICK A FIRMWARE", 0, 0);
+  pk_screen("PICK ONE", 0, 0);
   scr_center(222, "KNOB: MOVE   BUTTON: PICK", 1, SCR_FG);
   pk_list();
 }
@@ -242,6 +282,15 @@ static void pk_input(int32_t *steps, uint32_t *button, int32_t *key)
     }
 }
 
+/* the picked row, to the ESP32: install it, or back up (once a second, until the boot ROM's key comes) */
+static void pk_do(void)
+{
+  if (pk_sel)
+    pk_say("install ", pk_files[pk_sel]);
+  else
+    pk_say("backup", 0);
+}
+
 enum { PK_WAIT, PK_MENU, PK_SURE, PK_ASKED };
 
 static void pk_main(void)
@@ -254,7 +303,8 @@ static void pk_main(void)
   scr_init();
   fm1_input_init();
   fm1_adc_init();
-  pk_screen("LILFM1BUDDY", "WAITING FOR", "THE LIST OF FIRMWARES");
+  str_cpy(pk_names[0], "BACK UP THIS FM-1", sizeof pk_names[0]);
+  pk_screen("LILFM1BUDDY", "WAITING FOR", "THE LIST");
   usb_start();
   for (;;) {
     const uint8_t *p;
@@ -266,20 +316,30 @@ static void pk_main(void)
       fm1_delay_ms(30);
       fm1_enter_uboot();
     }
-    if (ota_frame_get(&p, &n) && n >= 3u && p[0] == 0x7D && p[1] == 0x4C && p[2] == 0x42) {
-      pk_frame(p + 3, n - 3u);
+    if (ota_frame_get(&p, &n) && n >= 4u && p[0] == 0x7D && p[1] == 0x4C && p[2] == 0x42 && p[3] >= 0x20u) {
+      pk_line(p + 3, n - 3u);
       ota_frame_done();
     }
     ota_service(); /* handshake: who it is */
     usb.ota_req = 0; /* (M-UPGRADE: not here) */
-    if (state == PK_WAIT && pk_complete()) {
+    if (pk_err[0]) {
+      pk_screen("BUDDY SAYS", 0, pk_err);
+      pk_err[0] = 0;
+      if (state == PK_ASKED)
+        state = PK_SURE; /* (button: again) */
+    }
+    if (state == PK_WAIT && pk_asking == PK_ASKED_ALL) {
       state = PK_MENU;
       pk_menu();
     }
     if ((state == PK_WAIT || state == PK_ASKED) && now - said >= 1000u) {
       said = now;
-      if (usb.config)
-        pk_send(state == PK_WAIT ? 0x10 : 0x12, state == PK_WAIT ? -1 : (int32_t)pk_sel);
+      if (usb.config && state == PK_ASKED)
+        pk_do();
+      else if (usb.config && pk_asking != PK_ASKED_ALL) { /* (from the top, until it's all come) */
+        pk_asking = PK_ASK_INFO;
+        pk_say("info", 0);
+      }
     }
     if (pk_batt_poll(now) | (pk_lil != shown_lil)) {
       shown_lil = pk_lil;
@@ -303,15 +363,16 @@ static void pk_main(void)
       }
       if (button) {
         state = PK_SURE;
-        pk_screen("INSTALL", pk_names[pk_sel], "BUTTON: YES   KNOB: NO");
+        pk_screen(pk_sel ? "INSTALL" : "BACK UP", pk_sel ? pk_names[pk_sel] : "ALL OF ITS FLASH", "BUTTON: YES   KNOB: NO");
         if (pk_fm1 == 0)
           scr_center(160, "LOW BATTERY: CHARGE THE FM-1 FIRST", 1, SCR_BAR);
       }
     } else if (state == PK_SURE) {
       if (button) {
         state = PK_ASKED;
-        said = 0;
-        pk_screen("INSTALLING", pk_names[pk_sel], "DO NOT UNPLUG");
+        said = now;
+        pk_do();
+        pk_screen(pk_sel ? "INSTALLING" : "BACKING UP", pk_names[pk_sel], "DO NOT UNPLUG");
       } else if (steps || key >= 0) {
         state = PK_MENU;
         pk_menu();

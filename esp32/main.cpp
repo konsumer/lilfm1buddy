@@ -3,36 +3,50 @@
 // A computer: a USB drive ("LILFM1") with what it keeps on it:
 //
 //   *.fwsc          firmwares (FM-1 packages)
-//   *.bin           backups of an FM-1's flash (made from the FM-1's menu)
+//   *.bin           backups of an FM-1's flash
+//   menu.ram        the menu on the FM-1's screen (picker/: run from its RAM), if it isn't the one built in
 //   wl82loader.bin  JieLi's loader, for writing the FM-1's flash (the web page gets it)
 //   midimap.txt     MIDI routing on the FM-1 (fm1buddy's rules: midimap.h). A line "bluetooth" turns on Bluetooth
 //                   MIDI too, "bluetooth NAME" connects to a Bluetooth MIDI device of that name as well
 //   log.txt         what happened last time on the FM-1
 //
-// Ejected, it's the computer's serial port until it's unplugged (for installing this program, and its console: below,
-// and tools/lil.py, to drive it from a script). Unplugged,
-// it restarts (for the FM-1). Installing it any time: the chip's own download mode (hold BOOT, tap reset), which
-// nothing here can break.
+// Ejected, it's the computer's serial port until it's unplugged (for installing this program, and its commands:
+// below, and tools/lil.py). Unplugged, it restarts (for the FM-1). Installing it any time: the chip's own download
+// mode (hold BOOT, tap reset), which nothing here can break.
 //
 // The FM-1, straight or on a powered hub with other MIDI devices: their USB host. With a midimap.txt it routes MIDI
-// between them (and Bluetooth). Press BOOT (it wakes it too) for the menu on the FM-1's screen:
+// between them (and Bluetooth). Press BOOT (it wakes it too) for the menu:
 //
 //   1. the FM-1 into its boot ROM: SysEx to its firmware (stock V15, Felucca-based ones). If that doesn't work, the
 //      board restarts into key mode (fm1buddy's key_s3.cpp), and the key does it as the FM-1 is switched on. The key
 //      needs the FM-1 straight on the port: no hub
-//   2. the picker (picker/, in this program) into its RAM, and a jump to it. Nothing is written to its flash yet:
+//   2. the menu (menu.ram, or the one built in) into its RAM, and a jump to it. Nothing is written to its flash:
 //      switching the FM-1 off and on brings its firmware back
-//   3. the picker asks for the list (picker.c says how), shows it, and says which one
-//   4. a firmware or a backup: the FM-1 back into its boot ROM (the picker takes the SysEx too), JieLi's loader, and
-//      the sectors from 0x4000 to the image's end that differ. Its head (what the chip starts from) and key_mac stay.
-//      "Back up this FM-1": its whole flash to backup-N.bin
+//   3. the menu asks for what it needs with the commands below, and for what's picked: "install NAME" (the FM-1
+//      back into its boot ROM, JieLi's loader, and the sectors from 0x4000 to the image's end that differ; its head,
+//      what the chip starts from, and key_mac stay) or "backup" (its whole flash to backup-N.bin)
 //
 // Then it sleeps (and when nothing's happening for a while): BOOT or its reset button wakes it.
+//
+// The commands, the same on the serial port (a line each) and from any USB MIDI device on the FM-1 side (a line in
+// each SysEx: F0 7D 4C 42 TEXT F7, answered the same way): the menu's, and any FM-1 firmware's that wants them. Each
+// answer ends with a line "OK" or "ERR why":
+//
+//   info               lilfm1buddy VERSION free=BYTES loader=0|1 battery=BARS (0..3, -1: it can't tell)
+//   ls                 NAME BYTES, a line for each file on the drive (names up to 60 characters)
+//   read OFF LEN NAME  LEN bytes (up to 64) of a file from OFF, in hex
+//   rm NAME            the file gone
+//   install NAME       (from the FM-1) that firmware or backup onto it; OK first, then it's done
+//   backup             (from the FM-1) its whole flash to backup-N.bin; OK first
+//   run NAME           (from the FM-1) a program (.ram) into its RAM, and a jump to it; OK first
+//   log                (serial) log.txt
+//   disk               (serial) the USB drive again
 #include <Arduino.h>
 #include <dirent.h>
 #include <driver/rtc_io.h>
 #include <esp_sleep.h>
 #include <soc/rtc_cntl_reg.h>
+#include <stdarg.h>
 #include <sys/stat.h>
 
 #include <algorithm>
@@ -46,18 +60,14 @@
 #include "midi.h"
 #include "rom.h"
 
-#define LOADER FS "/wl82loader.bin"
 #define MAP FS "/midimap.txt"
-#define PICKER_VID 0x1209
-#define PICKER_PID 0x0002
-#define LIST_MAX 24   // picker.c's PK_MAX
-#define PICK_NAME 20  // and PK_NAME
-#define BACKUP_NAME "Back up this FM-1"
+#define MENU "menu.ram"
 #define FLASH_SIZE 0x100000u
 #define IDLE_MS 120000  // nothing to do for this long: sleep
-#define VERSION "0.2.0"
+#define MENU_MS 600000  // (with the menu up: nothing picked)
+#define VERSION "0.3.0"
 
-// the picker (picker/build.sh: build/picker.bin, in this program)
+// the menu built in (picker/build.sh: build/picker.bin)
 extern const uint8_t pickerStart[] asm("_binary_build_picker_bin_start");
 extern const uint8_t pickerEnd[] asm("_binary_build_picker_bin_end");
 
@@ -114,41 +124,11 @@ static bool endsWith(const std::string& s, const char* e) {
   return s.size() > n && !strcasecmp(s.c_str() + s.size() - n, e);
 }
 
-// the menu: backing up first, then the firmwares and backups on the drive, by name
-static std::vector<std::string> menu() {
-  std::vector<std::string> l;
-  if (DIR* d = opendir(FS)) {
-    while (dirent* e = readdir(d)) {
-      std::string f = e->d_name;
-      if (f[0] != '.' && f != "wl82loader.bin" && (endsWith(f, ".fwsc") || endsWith(f, ".bin"))) {
-        l.push_back(f);
-      }
-    }
-    closedir(d);
-  }
-  std::sort(l.begin(), l.end(), [](const std::string& a, const std::string& b) { return strcasecmp(a.c_str(), b.c_str()) < 0; });
-  l.insert(l.begin(), BACKUP_NAME);
-  l.resize(std::min<size_t>(l.size(), LIST_MAX));
-  return l;
-}
-
-// its name for the FM-1's screen: no extension, 7-bit, PICK_NAME at most
-static std::string shortName(const std::string& f) {
-  std::string out;
-  for (char c : f.substr(0, f.rfind('.'))) {
-    if (out.size() < PICK_NAME) {
-      out += c >= 0x20 && c < 0x7F ? c : '?';
-    }
-  }
-  return out;
-}
-
-// a USB MIDI device within ms: a running FM-1, or the picker (vid:pid); its device, or -1
-static int find(uint32_t ms, uint16_t vid = 0, uint16_t pid = 0) {
+// a running FM-1 on USB within ms: its device, or -1
+static int find(uint32_t ms) {
   for (uint32_t start = millis(); millis() - start < ms; delay(100)) {
     for (int d = 0; d < MIDI_USB; d++) {
-      midi::Dev v;
-      if (vid ? midi::dev(d, v) && v.on && v.vid == vid && v.pid == pid : fm1::candidate(d)) {
+      if (fm1::candidate(d)) {
         return d;
       }
     }
@@ -183,42 +163,7 @@ static const char* toRom() {
   return e;
 }
 
-// the picker's side: the list when it asks, until it says which one; that one, -1 (it went) or -2 (nothing was
-// picked in 10 minutes)
-static int listen(int d, const std::vector<std::string>& list) {
-  static const uint8_t HELLO[] = {0xF0, 0x7D, 0x4C, 0x42, 0x10, 0xF7};
-  for (uint32_t start = millis(); millis() - start < 600000;) {
-    midi::Dev v;
-    if (!midi::dev(d, v) || !v.on) {
-      return -1;
-    }
-    uint8_t m[SYSEX_MAX];
-    uint32_t n = midi::sysex(d, m);
-    if (!n) {
-      delay(20);
-    } else if (n == sizeof HELLO && !memcmp(m, HELLO, n)) {
-      for (size_t i = 0; i < list.size(); i++) {
-        std::string name = shortName(list[i]);
-        uint8_t out[8 + PICK_NAME] = {0xF0, 0x7D, 0x4C, 0x42, 0x01, (uint8_t)i, (uint8_t)list.size()};
-        memcpy(out + 7, name.data(), name.size());
-        out[7 + name.size()] = 0xF7;
-        midi::sendWait(d, out, 8 + name.size(), 1000);
-        delay(30);  // (it takes one SysEx at a time: one that comes before it took the last is lost)
-      }
-      int bars = batteryBars();
-      if (bars >= 0) {  // (its battery, for the picker's header)
-        uint8_t out[] = {0xF0, 0x7D, 0x4C, 0x42, 0x02, (uint8_t)bars, 0xF7};
-        midi::sendWait(d, out, sizeof out, 1000);
-      }
-      midi::drain(d);  // (the hellos that came meanwhile)
-    } else if (n == 7 && !memcmp(m, HELLO, 4) && m[4] == 0x12 && m[5] < list.size()) {
-      return m[5];
-    }
-  }
-  return -2;
-}
-
-// from the picker (device d) to JieLi's loader, on the FM-1's chip: 0, or an error
+// from a program (device d: the menu, or a firmware that takes the boot ROM's SysEx) to JieLi's loader, on the FM-1's chip: 0, or an error
 static const char* toLoader(int d, const std::vector<uint8_t>& loader, rom::Chip& chip) {
   const char* e;
   if ((e = rom::enter(d)) || (e = rom::attach(10000)) || (e = rom::loader(loader.data(), loader.size(), chip))) {
@@ -336,48 +281,6 @@ static const char* install(int d, const std::string& file, const std::vector<uin
   return e;
 }
 
-// the menu on the FM-1, and what's picked there. Never returns: it sleeps after
-static void picker() {
-  std::vector<uint8_t> loader(LOADER_SIZE + 1);
-  char sha[65];
-  const char* e = 0;
-  FILE* f = fsOk ? fopen(LOADER, "rb") : 0;
-  loader.resize(f ? fread(loader.data(), 1, loader.size(), f) : 0);
-  if (f) {
-    fclose(f);
-  }
-  if (!fsOk) {
-    e = "Its drive didn't mount.";
-  } else if (!hal::sha256(loader.data(), loader.size(), sha) || strcmp(sha, LOADER_SHA256)) {
-    e = "No wl82loader.bin on its drive (or not JieLi's).";
-  }
-  if (e || (e = toRom()) || (e = rom::run(PICKER_AT, pickerStart, pickerEnd - pickerStart))) {
-    fail(e);
-    sleepNow();
-  }
-  int d = find(10000, PICKER_VID, PICKER_PID);
-  if (d < 0) {
-    fail("The picker didn't show up on USB.");
-    sleepNow();
-  }
-  std::vector<std::string> list = menu();
-  led(LED_PICK);
-  say("Pick one on the FM-1 (%u).", (unsigned)list.size());
-  int i = listen(d, list);
-  if (i < 0) {
-    fail(i == -1 ? "The picker went (the FM-1 restarted?)." : "Nothing was picked: switch the FM-1 off and on.");
-    sleepNow();
-  }
-  say("%s", list[i].c_str());
-  if ((e = i == 0 ? backup(d, loader) : install(d, list[i], loader))) {
-    fail(e);
-  } else {
-    led(LED_DONE);
-    say("Done.");
-  }
-  sleepNow();
-}
-
 // MIDI routing, with a midimap.txt (and Bluetooth MIDI, if it says so): on or not
 static bool routing() {
   FILE* f = fsOk ? fopen(MAP, "r") : 0;
@@ -429,42 +332,257 @@ static void bleConnect() {
   }
 }
 
-// on the FM-1 (or a hub): routing until BOOT, then the menu
-static void host(void*) {
-  bool woke = esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0;
-  if (!hal::recoveryMode() && !woke) {
-    bool routes = routing();
-    led(routes ? LED_ROUTING : LED_READY);
-    say("%sBOOT: the menu on the FM-1.", routes ? "Routing MIDI. " : "");
-    uint32_t idle = millis(), count = 0;
-    while (!bootPressed()) {
-      delay(20);
-      uint32_t c = 0;
-      bool any = false;
-      for (int d = 0; d < MIDI_TOUCH; d++) {
-        midi::Dev v;
-        if (midi::dev(d, v) && v.on) {
-          c += v.count;
-          any = true;
+// a file on the drive: false if there's none, or it's more than max
+static bool load(const char* name, std::vector<uint8_t>& out, uint32_t max) {
+  FILE* f = fsOk ? fopen((FS "/" + std::string(name)).c_str(), "rb") : 0;
+  out.resize(max + 1);
+  out.resize(f ? fread(out.data(), 1, out.size(), f) : 0);
+  if (f) {
+    fclose(f);
+  }
+  return !out.empty() && out.size() <= max;
+}
+
+static const char* jieliLoader(std::vector<uint8_t>& out) {
+  char sha[65];
+  return load("wl82loader.bin", out, LOADER_SIZE) && hal::sha256(out.data(), out.size(), sha) && !strcmp(sha, LOADER_SHA256)
+             ? 0
+             : "No wl82loader.bin on its drive (or not JieLi's).";
+}
+
+// the boot ROM there (after toRom, or enter): a program into the FM-1's RAM, and a jump to it. 0, or an error
+static const char* runProgram(const char* name) {
+  std::vector<uint8_t> p;
+  if (load(name, p, PICKER_MAX)) {
+    say("%s, from its drive", name);
+    return rom::run(PICKER_AT, p.data(), p.size());
+  }
+  if (strcmp(name, MENU)) {
+    return "No such program on its drive.";
+  }
+  return rom::run(PICKER_AT, pickerStart, pickerEnd - pickerStart);  // (the menu built in)
+}
+
+// ---- the commands ----
+static int replyTo = -1;  // where answers go: the serial port (-1), or a USB MIDI device
+
+static void reply(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
+static void reply(const char* fmt, ...) {
+  char s[160];
+  va_list a;
+  va_start(a, fmt);
+  vsnprintf(s, sizeof s, fmt, a);
+  va_end(a);
+  if (replyTo < 0) {
+    Serial.println(s);
+    return;
+  }
+  uint8_t m[sizeof s + 5] = {0xF0, 0x7D, 0x4C, 0x42};
+  uint32_t n = 4;
+  for (const char* c = s; *c; c++) {
+    m[n++] = *c & 0x80 ? '?' : *c;  // (SysEx: 7-bit)
+  }
+  m[n++] = 0xF7;
+  midi::sendWait(replyTo, m, n, 1000);
+  delay(30);  // (the menu takes one SysEx at a time: one that comes before it took the last is lost)
+}
+
+// what a command left to do once it's answered (install, backup, run, disk), and for which device
+enum Act { ACT_NONE,
+           ACT_INSTALL,
+           ACT_BACKUP,
+           ACT_RUN,
+           ACT_DISK };
+static Act act;
+static std::string actFile;
+static int actDev;
+
+static bool fileName(const char* n) {
+  return n[0] && n[0] != '.' && !strchr(n, '/') && strlen(n) <= 60;
+}
+
+static bool exists(const char* n) {
+  struct stat st;
+  return fileName(n) && !stat((FS "/" + std::string(n)).c_str(), &st) && S_ISREG(st.st_mode);
+}
+
+// a command from the serial port (dev -1) or USB MIDI device dev; answered there
+static void command(const char* line, int dev) {
+  char cmd[16] = "", arg[80] = "";
+  unsigned off, len;
+  sscanf(line, "%15s %79[^\r\n]", cmd, arg);
+  replyTo = dev;
+  bool fm1 = dev >= 0;
+  say("< %s", line);
+  if (!fsOk && strcmp(cmd, "disk")) {
+    reply("ERR Its drive didn't mount.");
+    return;
+  }
+  if (!strcmp(cmd, "info")) {
+    std::vector<uint8_t> l;
+    reply("lilfm1buddy " VERSION " free=%llu loader=%d battery=%d", disk::freeBytes(), !jieliLoader(l), batteryBars());
+  } else if (!strcmp(cmd, "ls")) {
+    if (DIR* d = opendir(FS)) {
+      while (dirent* e = readdir(d)) {
+        struct stat st;
+        if (fileName(e->d_name) && !stat((FS "/" + std::string(e->d_name)).c_str(), &st) && S_ISREG(st.st_mode)) {
+          reply("%s %u", e->d_name, (unsigned)st.st_size);
         }
       }
-      if (c != count) {
-        ledFlash(FLASH_MIDI);
-        count = c;
+      closedir(d);
+    }
+  } else if (!strcmp(cmd, "read") && sscanf(arg, "%u %u %79[^\r\n]", &off, &len, arg) == 3 && len <= 64) {
+    FILE* f = exists(arg) ? fopen((FS "/" + std::string(arg)).c_str(), "rb") : 0;
+    uint8_t b[64];
+    char hex[129] = "";
+    size_t n = f && !fseek(f, off, SEEK_SET) ? fread(b, 1, len, f) : 0;
+    if (f) {
+      fclose(f);
+    }
+    if (!f) {
+      reply("ERR No such file.");
+      return;
+    }
+    for (size_t i = 0; i < n; i++) {
+      sprintf(hex + i * 2, "%02x", b[i]);
+    }
+    reply("%s", hex);
+  } else if (!strcmp(cmd, "rm")) {
+    if (!exists(arg) || remove((FS "/" + std::string(arg)).c_str())) {
+      reply("ERR No such file.");
+      return;
+    }
+  } else if (fm1 && (!strcmp(cmd, "install") || !strcmp(cmd, "run"))) {
+    if (!exists(arg) && strcmp(arg, MENU)) {
+      reply("ERR No such file.");
+      return;
+    }
+    act = cmd[0] == 'i' ? ACT_INSTALL : ACT_RUN, actFile = arg, actDev = dev;
+  } else if (fm1 && !strcmp(cmd, "backup")) {
+    act = ACT_BACKUP, actDev = dev;
+  } else if (!fm1 && !strcmp(cmd, "log")) {
+    if (FILE* f = fopen(LOG_FILE, "r")) {
+      char b[256];
+      for (size_t k; (k = fread(b, 1, sizeof b, f));) {
+        Serial.write((uint8_t*)b, k);
       }
-      if (routes && any) {
-        idle = millis();
-      }
-      if (millis() - idle > IDLE_MS) {
-        sleepNow(0);
-      }
-      if (routes) {
-        bleConnect();
+      fclose(f);
+    }
+  } else if (!fm1 && !strcmp(cmd, "disk")) {
+    act = ACT_DISK;
+  } else {
+    reply("ERR What's \"%s\"?", cmd);
+    return;
+  }
+  reply("OK");
+}
+
+// ---- on the FM-1 ----
+// the menu on it: 0, or an error
+static const char* startMenu() {
+  midi::route(false);
+  const char* e = toRom();
+  if (!e && !(e = runProgram(MENU))) {
+    led(LED_PICK);
+    say("The menu's on the FM-1.");
+  }
+  return e;
+}
+
+// what a command left to do: install, backup (then it sleeps), or run
+static void doAction() {
+  Act a = act;
+  act = ACT_NONE;
+  std::vector<uint8_t> loader;
+  const char* e = 0;
+  if (a == ACT_RUN) {
+    if ((e = rom::enter(actDev)) || (e = rom::attach(10000)) || (e = runProgram(actFile.c_str()))) {
+      fail(e);
+      sleepNow();
+    }
+    return;
+  }
+  say("%s %s", a == ACT_INSTALL ? "Installing" : "Backing up", actFile.c_str());
+  if (!(e = jieliLoader(loader))) {
+    e = a == ACT_INSTALL ? install(actDev, actFile, loader) : backup(actDev, loader);
+  }
+  if (e) {
+    fail(e);
+  } else {
+    led(LED_DONE);
+    say("Done.");
+  }
+  sleepNow();
+}
+
+// commands from the USB MIDI devices: true if any came
+static bool commands() {
+  bool any = false;
+  for (int d = 0; d < MIDI_USB; d++) {
+    uint8_t m[SYSEX_MAX + 1];
+    for (uint32_t n; (n = midi::sysex(d, m));) {
+      if (n > 5 && m[1] == 0x7D && m[2] == 0x4C && m[3] == 0x42 && m[4] >= 0x20) {
+        m[n - 1] = 0;  // (the F7)
+        command((char*)m + 4, d);
+        any = true;
       }
     }
-    midi::route(false);
   }
-  picker();
+  return any;
+}
+
+// on the FM-1 (or a hub): routing, and commands, until BOOT (or a wake by it, or key mode): the menu
+static void host(void*) {
+  bool menu = hal::recoveryMode() || esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0;
+  bool routes = !menu && routing();
+  const char* e;
+  if (menu && (e = startMenu())) {
+    fail(e);
+    sleepNow();
+  }
+  if (!menu) {
+    led(routes ? LED_ROUTING : LED_READY);
+    say("%sBOOT: the menu on the FM-1.", routes ? "Routing MIDI. " : "");
+  }
+  uint32_t idle = millis(), count = 0;
+  for (;;) {
+    delay(10);
+    if (!menu && bootPressed()) {
+      if ((e = startMenu())) {
+        fail(e);
+        sleepNow();
+      }
+      menu = true, routes = false, idle = millis();
+    }
+    if (commands()) {
+      idle = millis();
+    }
+    if (act) {
+      doAction();
+      idle = millis();
+    }
+    uint32_t c = 0;
+    bool any = false;
+    for (int d = 0; d < MIDI_TOUCH; d++) {
+      midi::Dev v;
+      if (midi::dev(d, v) && v.on) {
+        c += v.count;
+        any = true;
+      }
+    }
+    if (c != count) {
+      ledFlash(FLASH_MIDI);
+      count = c;
+    }
+    if (routes && any) {
+      idle = millis();
+      bleConnect();
+    }
+    if (millis() - idle > (menu ? MENU_MS : IDLE_MS)) {
+      say("%s", menu ? "Nothing was picked." : "Nothing to do.");
+      sleepNow(0);
+    }
+  }
 }
 
 void setup() {
@@ -503,15 +621,9 @@ void setup() {
   xTaskCreatePinnedToCore(host, "lil", 16384, 0, 1, 0, 1);
 }
 
-// the serial port's commands, a line each. Each answer ends with a line "OK" or "ERR why" (the log's lines may come
-// between):
-//
-//   info   lilfm1buddy VERSION free=BYTES loader=0|1
-//   ls     NAME BYTES, a line for each file on the drive
-//   log    log.txt (what happened last time on the FM-1)
-//   disk   OK, then it restarts as the USB drive
+// ---- on a computer, ejected: the commands on the serial port ----
 static void console() {
-  static char line[80];
+  static char line[120];
   static uint8_t n;
   while (Serial.available() > 0) {
     char c = Serial.read();
@@ -523,44 +635,14 @@ static void console() {
     }
     line[n] = 0;
     n = 0;
-    if (!line[0]) {
-      continue;
+    if (line[0]) {
+      command(line, -1);
     }
-    if (!fsOk && strcmp(line, "disk")) {
-      Serial.println("ERR Its drive didn't mount.");
-    } else if (!strcmp(line, "info")) {
-      char sha[65];
-      bool loader = hal::sha256(LOADER, sha) && !strcmp(sha, LOADER_SHA256);
-      Serial.printf("lilfm1buddy " VERSION " free=%llu loader=%d\nOK\n", disk::freeBytes(), loader);
-    } else if (!strcmp(line, "ls")) {
-      if (DIR* d = opendir(FS)) {
-        while (dirent* e = readdir(d)) {
-          struct stat st;
-          std::string p = FS "/" + std::string(e->d_name);
-          if (!stat(p.c_str(), &st) && S_ISREG(st.st_mode)) {
-            Serial.printf("%s %u\n", e->d_name, (unsigned)st.st_size);
-          }
-        }
-        closedir(d);
-      }
-      Serial.println("OK");
-    } else if (!strcmp(line, "log")) {
-      if (FILE* f = fopen(LOG_FILE, "r")) {
-        char b[256];
-        for (size_t k; (k = fread(b, 1, sizeof b, f));) {
-          Serial.write((uint8_t*)b, k);
-        }
-        fclose(f);
-      }
-      Serial.println("OK");
-    } else if (!strcmp(line, "disk")) {
-      Serial.println("OK");
-      Serial.flush();
-      delay(100);
-      esp_restart();  // (a computer on it: the drive)
-    } else {
-      Serial.printf("ERR What's \"%s\"? (info, ls, log, disk)\n", line);
-    }
+  }
+  if (act == ACT_DISK) {
+    Serial.flush();
+    delay(100);
+    esp_restart();  // (a computer on it: the drive)
   }
 }
 

@@ -3,6 +3,7 @@
 // log.txt (esp32/main.cpp)
 
 const LOADER = 'wl82loader.bin'
+const MENU = 'menu.ram' // the menu on the FM-1's screen (picker/), if it isn't the one built into the board
 const LOADER_URL = 'https://raw.githubusercontent.com/kagaimiq/jl-uboot-tool/c32b28e7a04f873f526ba929cb1bae9f05442fe9/data/loaderblobs/usb/wl82loader.bin'
 const LOADER_SHA256 = 'd41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68dca5376'
 const HUB = 'https://thefirmwarehub.com/' // the FM-1 Firmware Hub: catalog.json, and the packages next to it
@@ -67,6 +68,13 @@ async function refresh() {
   const ok = loader && (await sha256(await loader.arrayBuffer())) === LOADER_SHA256
   $('#loader').innerHTML = ok ? '<span class="good">On the drive.</span>' : '<span class="bad">Not on the drive yet: it can\'t write the FM-1 without it.</span>'
   $('#getloader').hidden = ok
+  const menu = await read(MENU)
+  const latest = await fetch('fw/' + MENU)
+    .then((r) => (r.ok ? r.arrayBuffer() : null))
+    .catch(() => null)
+  const same = menu && latest && (await sha256(await menu.arrayBuffer())) === (await sha256(latest))
+  $('#menu').textContent = menu ? `${MENU} on the drive${same ? ': the latest.' : '.'}` : 'The one built into the board.'
+  $('#getmenu').hidden = !latest || same
   $('#map').textContent = (await read('midimap.txt')) ? 'midimap.txt is on the drive: the board routes MIDI on the FM-1.' : 'No midimap.txt: no MIDI routing.'
   const files = []
   for await (const [name, h] of drive.entries()) {
@@ -127,6 +135,14 @@ $('#getloader').addEventListener('click', () =>
     const bytes = new Uint8Array(await r.arrayBuffer())
     if ((await sha256(bytes)) !== LOADER_SHA256) throw new Error("That isn't the loader it should be.")
     await put(LOADER, bytes)
+  })
+)
+
+$('#getmenu').addEventListener('click', () =>
+  run('Getting the latest menu…', async () => {
+    const r = await fetch('fw/' + MENU)
+    if (!r.ok) throw new Error(`Couldn't get it (${r.status}).`)
+    await put(MENU, new Uint8Array(await r.arrayBuffer()))
   })
 )
 

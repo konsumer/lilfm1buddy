@@ -28,7 +28,7 @@ struct Chip {
   uint32_t io;       // the most a read moves at once
 };
 
-// a running FM-1 (MIDI device d) into its boot ROM, by SysEx (stock V15, Felucca-based firmwares, the picker); 0 or
+// a running FM-1 (MIDI device d) into its boot ROM, by SysEx (stock V15, Felucca-based firmwares, the menu); 0 or
 // an error
 const char* enter(int d);
 // the boot ROM there and answering, within ms (after enter, or the key); 0 or an error

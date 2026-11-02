@@ -137,7 +137,7 @@ const char* rom::attach(uint32_t ms) {
 
 const char* rom::run(uint32_t addr, const uint8_t* image, uint32_t n) {
   if (!writeMemory(addr, image, n, true)) {
-    return "Its boot ROM didn't take the picker.";
+    return "Its boot ROM didn't take the menu.";
   }
   // the jump: its answer may be lost (the program has the USB port by then). Gone from USB within a few seconds:
   // it jumped

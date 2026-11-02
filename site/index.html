@@ -43,7 +43,7 @@
           </ul>
           <p>No power switch: when it's done, or nothing happens for a while, the board goes to deep sleep (months on that battery). <strong>Press its BOOT button (or reset) to wake it.</strong></p>
           <h2>1. The program</h2>
-          <p>Plug the XIAO into this computer and press Install. A new board, or one with lilfm1buddy 0.1 on it: let it erase (its files go: it keeps them on a USB drive now). To update one, don't: its files stay.</p>
+          <p>Plug the XIAO into this computer. A new board: hold its BOOT button, tap reset, and let go (its download mode). One with lilfm1buddy on it: eject its drive (its LED goes blue). Then press Install. A new board, or one with lilfm1buddy 0.1 on it: let it erase (its files go: it keeps them on a USB drive now). To update one, don't: its files stay. Then tap reset.</p>
           <esp-web-install-button id="install" manifest="fw/xiaoplus/manifest.json">
             <button slot="activate" class="button">Install lilfm1buddy</button>
             <span slot="unsupported">Your browser can't: use Chrome or Edge on a computer.</span>
@@ -51,7 +51,7 @@
           </esp-web-install-button>
           <p id="nofw" class="bad" hidden>No build yet: the page has no firmware next to it.</p>
           <h2>2. JieLi's loader, and firmwares</h2>
-          <p>With the board on this computer, <strong>press its BOOT button</strong>: its LED blinks white three times, and it's a USB drive, <code>LILFM1</code>. Put <code>.fwsc</code> firmwares on it (drag them there, or from the Drive tab). Eject it, or press BOOT again, when you're done.</p>
+          <p>On a computer the board is a USB drive, <code>LILFM1</code> (its LED cyan). Put <code>.fwsc</code> firmwares on it (drag them there, or from the Drive tab). Eject it when you're done.</p>
           <p>The board writes the FM-1's flash with the loader JieLi made for its chip (<code>wl82loader.bin</code>). It isn't ours to hand out: the Drive tab gets it from <a href="https://github.com/kagaimiq/jl-uboot-tool">jl-uboot-tool</a>, checks it, and puts it on the drive.</p>
           <p><a href="#drive" class="button" data-tab="drive">Go to Drive</a></p>
         </section>
@@ -59,7 +59,7 @@
 
       <div data-page="drive" hidden>
         <section class="panel">
-          <p>The board's USB drive (BOOT, with the board on this computer): press Open, and pick the drive, <code>LILFM1</code>.</p>
+          <p>The board on this computer is a USB drive: press Open, and pick it, <code>LILFM1</code>.</p>
           <p class="row">
             <button id="open" class="button">Open the drive</button>
             <span id="drive" class="dim"></span>
@@ -119,12 +119,12 @@
           <table>
             <tbody>
               <tr>
-                <td>on a computer</td>
-                <td>blue</td>
+                <td>on a computer: a USB drive (flashes as it's read or written)</td>
+                <td>cyan</td>
               </tr>
               <tr>
-                <td>a USB drive (flashes as it's read or written)</td>
-                <td>cyan</td>
+                <td>ejected: a serial port, until it's unplugged</td>
+                <td>blue</td>
               </tr>
               <tr>
                 <td>on the FM-1, waiting for BOOT</td>

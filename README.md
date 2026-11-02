@@ -25,9 +25,11 @@ The board is the FM-1's USB host: each on its own battery, one USB-C data cable 
 
 ## Use it
 
-On a computer, the board is a serial port (for installing it, and its log). **Press BOOT** and it's a USB drive,
-`LILFM1` (its LED blinks white, then stays cyan): put firmwares (`.fwsc`) and JieLi's `wl82loader.bin` on it (the web
-page's Drive tab does both). Eject it, or press BOOT again, and it's the serial port again. On the drive:
+On a computer, the board is a USB drive, `LILFM1` (its LED cyan): put firmwares (`.fwsc`) and JieLi's `wl82loader.bin`
+on it (the web page's Drive tab does both). Eject it and it's a serial port (blue) until it's unplugged: for installing
+its program, and its log. Its program installs from its download mode too (hold BOOT, tap reset), which nothing can
+break. Dot files a computer leaves on the drive (macOS's `._` copies, trash, indexes) are cleared away by the board,
+and macOS is told not to make most of them. On the drive:
 
 - `*.fwsc`: firmwares; `*.bin`: backups of an FM-1 (made from its menu)
 - `wl82loader.bin`: JieLi's loader, for writing the FM-1's flash

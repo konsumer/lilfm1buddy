@@ -8,6 +8,10 @@
 
 #include "lil.h"
 
+#ifndef LED_ORDER
+#define LED_ORDER LED_COLOR_ORDER_GRB  // most WS2812s (some ESP32-S3-Zeros: LED_COLOR_ORDER_RGB)
+#endif
+
 struct Look {
   uint8_t r, g, b;
   uint16_t blink[6];  // on, off, on, off... in ms (0 ends it; none: off)
@@ -16,9 +20,8 @@ struct Look {
 // in Led's order
 static const Look LOOKS[] = {
     {0, 0, 0, {0}},                                // off
-    {0, 0, 48, {1000, 0}},                         // serial: blue
-    {48, 48, 48, {100, 100, 100, 100, 100, 100}},  // to disk: three white blinks
     {0, 40, 40, {1000, 0}},                        // disk: cyan
+    {0, 0, 48, {1000, 0}},                         // serial: blue
     {0, 12, 0, {1000, 0}},                         // ready: dim green
     {0, 48, 0, {1000, 0}},                         // routing: green
     {0, 0, 64, {100, 900}},                        // looking: a blue blip a second
@@ -40,7 +43,7 @@ static void show(bool on, int f) {
   const uint8_t* c = f >= 0 ? FLASHES[f] : &LOOKS[state].r;
   int32_t v = f >= 0 || on ? c[0] << 16 | c[1] << 8 | c[2] : 0;
   if (v != last) {
-    rgbLedWrite(LED_RGB, c[0] * !!v, c[1] * !!v, c[2] * !!v);
+    rgbLedWriteOrdered(LED_RGB, LED_ORDER, c[0] * !!v, c[1] * !!v, c[2] * !!v);
   }
 #elif defined(LED_PIN)
   int32_t v = f >= 0 ? !on : on;

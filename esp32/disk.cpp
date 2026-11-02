@@ -3,17 +3,24 @@
 // and writes it at FS; in disk mode a computer does, as a USB drive, and the board leaves it alone.
 //
 // The flash erases 4 KB at a time: one 4 KB block is kept here, changed, and written back when another one is wanted,
-// or nothing more has come for a moment (disk::loop), or the file is closed (CTRL_SYNC)
+// or nothing more has come for a moment (disk::loop), or the file is closed (CTRL_SYNC). Erased first only if it has
+// to be: writing only clears bits, so over erased flash (or bits only going to 0) it needn't, and that's the slow part
 #include <Arduino.h>
 #include <USB.h>
 #include <USBMSC.h>
+#include <dirent.h>
 #include <diskio_impl.h>
 #include <esp_partition.h>
 #include <esp_vfs_fat.h>
 #include <ff.h>
 #include <soc/rtc_cntl_reg.h>
+#include <sys/stat.h>
+#include <tusb.h>
 
+#include <algorithm>
 #include <mutex>
+#include <string>
+#include <vector>
 
 #include "hal.h"
 #include "lil.h"
@@ -26,7 +33,7 @@ static const esp_partition_t* part;
 static std::mutex lock;
 static uint8_t cache[BLOCK];
 static int32_t cached = -1;
-static bool dirty;
+static bool dirty, erase;  // erase: a bit in it went from 0 to 1 (only an erase does that)
 static uint32_t lastWrite;
 
 static bool flushLocked() {
@@ -34,7 +41,11 @@ static bool flushLocked() {
     return true;
   }
   dirty = false;
-  return !esp_partition_erase_range(part, cached * BLOCK, BLOCK) && !esp_partition_write(part, cached * BLOCK, cache, BLOCK);
+  if (erase && esp_partition_erase_range(part, cached * BLOCK, BLOCK)) {
+    return false;
+  }
+  erase = false;
+  return !esp_partition_write(part, cached * BLOCK, cache, BLOCK);
 }
 
 static bool flush() {
@@ -70,6 +81,9 @@ static bool writeSectors(const uint8_t* in, uint32_t s, uint32_t n) {
     }
     uint8_t* at = cache + s * SS % BLOCK;
     if (memcmp(at, in, SS)) {  // (what's already there isn't written again)
+      for (int i = 0; i < SS && !erase; i++) {
+        erase = in[i] & ~at[i];
+      }
       memcpy(at, in, SS);
       dirty = true;
     }
@@ -113,6 +127,58 @@ static DRESULT dIoctl(BYTE, BYTE cmd, void* buf) {
   return RES_PARERR;
 }
 
+// a file or folder, and all that's in it
+static void removeAll(const std::string& p) {
+  if (DIR* d = opendir(p.c_str())) {
+    while (dirent* e = readdir(d)) {
+      removeAll(p + "/" + e->d_name);
+    }
+    closedir(d);
+    rmdir(p.c_str());
+  } else {
+    remove(p.c_str());
+  }
+}
+
+// the dot files a computer leaves (macOS's ._ copies, trash, indexes) gone, and what keeps macOS from making most of
+// them: a file .metadata_never_index (no Spotlight), .fseventsd/no_log (no event log), and a file .Trashes (no trash:
+// Finder deletes at once, and the room's free again). Written only when something's missing or there
+static void tidy() {
+  static const char* KEEP[] = {".metadata_never_index", ".fseventsd", ".Trashes"};
+  std::vector<std::string> gone;
+  if (DIR* d = opendir(FS)) {
+    while (dirent* e = readdir(d)) {
+      std::string n = e->d_name;
+      if (n[0] == '.' && std::find(std::begin(KEEP), std::end(KEEP), n) == std::end(KEEP)) {
+        gone.push_back(n);
+      }
+    }
+    closedir(d);
+  }
+  if (DIR* d = opendir(FS "/.fseventsd")) {  // (its logs: all but no_log)
+    while (dirent* e = readdir(d)) {
+      if (strcmp(e->d_name, "no_log")) {
+        gone.push_back(std::string(".fseventsd/") + e->d_name);
+      }
+    }
+    closedir(d);
+  }
+  struct stat st;
+  if (!stat(FS "/.Trashes", &st) && S_ISDIR(st.st_mode)) {
+    gone.push_back(".Trashes");
+  }
+  for (const std::string& n : gone) {
+    hal::log("disk: removing %s", n.c_str());
+    removeAll(FS "/" + n);
+  }
+  mkdir(FS "/.fseventsd", 0777);
+  for (const char* f : {FS "/.metadata_never_index", FS "/.fseventsd/no_log", FS "/.Trashes"}) {
+    if (stat(f, &st)) {
+      fclose(fopen(f, "w"));
+    }
+  }
+}
+
 static char drive[3];
 static FATFS* fs;
 
@@ -136,8 +202,10 @@ bool disk::mount() {
     r = f_mkfs(drive, &opt, work, sizeof work);
     if (!r && !(r = f_mount(fs, drive, 1))) {
       f_setlabel((std::string(drive) + LABEL).c_str());
-      fclose(fopen(FS "/.metadata_never_index", "w"));  // (macOS: no Spotlight index on it)
     }
+  }
+  if (!r) {
+    tidy();
   }
   hal::log("disk: %s", r ? "can't mount it" : "mounted");
   return !r;
@@ -153,14 +221,22 @@ uint64_t disk::freeBytes() {
 static USBMSC msc;
 static volatile bool ejected;
 
-void disk::loop() {
+// unplugged (still on its battery): a restart, for the FM-1
+bool disk::loop() {
+  static bool was;
   if (dirty && millis() - lastWrite > 500) {
     flush();
   }
-  if (ejected) {
-    delay(200);  // (its answer goes out first)
+  bool on = tud_mounted();
+  if (was && !on) {
+    hal::log("disk: unplugged");
     esp_restart();
   }
+  was = on;
+  if (ejected) {
+    delay(200);  // (its answer goes out first)
+  }
+  return ejected;
 }
 
 static int32_t onRead(uint32_t lba, uint32_t offset, void* buf, uint32_t n) {
@@ -173,9 +249,11 @@ static int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t* buf, uint32_t n) 
   return offset % SS || n % SS || !writeSectors(buf, lba + offset / SS, n / SS) ? -1 : n;
 }
 
-// the computer ejected it: done with it, back to the serial port
+// the computer ejected it: done with it
 static bool onStartStop(uint8_t, bool start, bool eject) {
   if (eject && !start) {
+    flush();
+    msc.mediaPresent(false);
     hal::log("disk: ejected");
     ejected = true;
   }

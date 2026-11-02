@@ -11,9 +11,8 @@
 
 // what the LED shows (led.cpp has how)
 enum Led { LED_OFF,
-           LED_SERIAL,   // on a computer: its serial port
-           LED_TO_DISK,  // becoming a USB drive
-           LED_DISK,     // a USB drive (flashes as it's read or written)
+           LED_DISK,     // on a computer: its USB drive (flashes as it's read or written)
+           LED_SERIAL,   // on a computer: its serial port (the drive ejected)
            LED_READY,    // on the FM-1, waiting for BOOT
            LED_ROUTING,  // the same, and routing MIDI (flashes as it goes through)
            LED_LOOKING,  // getting the FM-1 into its boot ROM
@@ -39,6 +38,8 @@ void logLoad();  // the last run's log carried on (a restart into key mode)
 namespace disk {
 bool mount();  // the drive at FS, formatted if it's new: false if it can't be
 uint64_t freeBytes();
-void usbBegin();  // the drive as a USB drive for the computer (not mounted here)
-void loop();      // writes what's waiting, once nothing more has come for a moment
+void usbBegin();  // the drive as a USB drive for the computer
+// writes what's waiting, once nothing more has come for a moment; restarts once the computer's gone. True once
+// it's ejected
+bool loop();
 }  // namespace disk

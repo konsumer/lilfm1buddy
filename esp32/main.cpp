@@ -1,7 +1,6 @@
 // lilfm1buddy: an ESP32-S3 on the FM-1's USB port. What it does depends on what's on that port when it starts:
 //
-// A computer: its serial port (for installing this program; its log goes there too). Press BOOT: it's a USB drive
-// ("LILFM1") with what it keeps on it:
+// A computer: a USB drive ("LILFM1") with what it keeps on it:
 //
 //   *.fwsc          firmwares (FM-1 packages)
 //   *.bin           backups of an FM-1's flash (made from the FM-1's menu)
@@ -10,7 +9,9 @@
 //                   MIDI too, "bluetooth NAME" connects to a Bluetooth MIDI device of that name as well
 //   log.txt         what happened last time on the FM-1
 //
-// Eject it (or press BOOT again) and it's the serial port again.
+// Ejected, it's the computer's serial port until it's unplugged (for installing this program, and its log). Unplugged,
+// it restarts (for the FM-1). Installing it any time: the chip's own download mode (hold BOOT, tap reset), which
+// nothing here can break.
 //
 // The FM-1, straight or on a powered hub with other MIDI devices: their USB host. With a midimap.txt it routes MIDI
 // between them (and Bluetooth). Press BOOT (it wakes it too) for the menu on the FM-1's screen:
@@ -53,15 +54,15 @@
 #define BACKUP_NAME "Back up this FM-1"
 #define FLASH_SIZE 0x100000u
 #define IDLE_MS 120000  // nothing to do for this long: sleep
-#define DISK_MODE 0x4449534B
 #define VERSION "0.2.0"
 
 // the picker (picker/build.sh: build/picker.bin, in this program)
 extern const uint8_t pickerStart[] asm("_binary_build_picker_bin_start");
 extern const uint8_t pickerEnd[] asm("_binary_build_picker_bin_end");
 
-static RTC_NOINIT_ATTR uint32_t diskFlag;  // a restart into disk mode
-static bool computer, diskMode, fsOk;
+#define SERIAL_MODE 0x53455249
+static RTC_NOINIT_ATTR uint32_t serialFlag;  // a restart into the serial port (the drive ejected)
+static bool computer, serial, fsOk;
 
 #define say(...) hal::log("lil: " __VA_ARGS__)
 
@@ -468,21 +469,22 @@ static void host(void*) {
 void setup() {
   Serial.begin(115200);
   ledBegin();
-  diskMode = diskFlag == DISK_MODE && esp_reset_reason() == ESP_RST_SW;
-  diskFlag = 0;
-  if (diskMode) {
-    led(LED_DISK);
-    disk::mount();  // (a new board's: formatted first, as the computer would ask to)
-    disk::usbBegin();
-    return;
-  }
-  // a computer on the port (it sends start-of-frames): stay its serial port. Else: the USB host
+  // a computer on the port (it sends start-of-frames): its USB drive. Else: the USB host
   for (uint32_t t = millis(); !hal::recoveryMode() && millis() - t < 1500 && !computer; delay(10)) {
     computer = HWCDC::isPlugged();
   }
-  if (computer) {
+  serial = computer && serialFlag == SERIAL_MODE && esp_reset_reason() == ESP_RST_SW;
+  serialFlag = 0;
+  if (serial) {
     led(LED_SERIAL);
-    say("lilfm1buddy " VERSION ", on a computer. BOOT: the USB drive.");
+    say("lilfm1buddy " VERSION ", on a computer: its serial port, until it's unplugged.");
+    return;
+  }
+  if (computer) {
+    led(LED_DISK);
+    say("lilfm1buddy " VERSION ", on a computer: its USB drive.");
+    disk::mount();  // (a new board's: formatted first, as the computer would ask to)
+    disk::usbBegin();
     return;
   }
   fsOk = disk::mount();
@@ -500,18 +502,16 @@ void setup() {
 }
 
 void loop() {
-  if (diskMode) {
-    disk::loop();
-    if (bootPressed()) {
-      diskFlag = 0;
-      esp_restart();  // (back to the serial port: disk.cpp's phyToSerial)
+  static uint32_t seen = millis();
+  if (serial) {
+    if (HWCDC::isPlugged()) {
+      seen = millis();
+    } else if (millis() - seen > 1000) {
+      esp_restart();  // (unplugged: for the FM-1)
     }
   } else if (computer) {
-    if (bootPressed()) {
-      led(LED_TO_DISK);
-      say("Into disk mode.");
-      delay(700);
-      diskFlag = DISK_MODE;
+    if (disk::loop()) {
+      serialFlag = SERIAL_MODE;
       esp_restart();
     }
   } else {

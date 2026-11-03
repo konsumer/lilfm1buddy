@@ -151,6 +151,13 @@ h2 {
   color: var(--bad);
 }
 
+.note {
+  padding: 10px 14px;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--code);
+}
+
 .good {
   color: #2b8a3e;
 }

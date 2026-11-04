@@ -193,7 +193,7 @@ static const char* toLoader(int d, const std::vector<uint8_t>& loader, rom::Chip
   if ((e = rom::enter(d)) || (e = rom::attach(10000)) || (e = rom::loader(loader.data(), loader.size(), chip))) {
     return e;
   }
-  if (chip.key != FM1_KEY || chip.flashId != FM1_FLASH || chip.size != FLASH_SIZE) {
+  if (chip.key != FM1_KEY || !fm1Flash(chip.flashId) || chip.size != FLASH_SIZE) {
     rom::leave();
     return "That isn't the FM-1's (or SMK-37's) chip: nothing was done.";
   }

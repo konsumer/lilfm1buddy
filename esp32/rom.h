@@ -18,12 +18,17 @@
 #define WRITE_FROM 0x4000u  // below: the flash's head (what the chip starts from), never written
 #define WRITE_TO 0xFF000u   // above: key_mac
 #define FM1_KEY 0x980F
-#define FM1_FLASH 0x856014u
+// its flash: 1 MiB SPI NOR, one of two makers' parts (the same type and size, written the same way)
+#define FM1_FLASH 0x856014u    // the FM-1's up to 2026
+#define FM1_FLASH_2 0xB36014u  // in newer FM-1s
+static inline bool fm1Flash(uint32_t id) {
+  return id == FM1_FLASH || id == FM1_FLASH_2;
+}
 
 namespace rom {
 struct Chip {
   uint16_t key;      // its chip key (0x980F)
-  uint32_t flashId;  // its flash's JEDEC id (0x856014: 1 MiB)
+  uint32_t flashId;  // its flash's JEDEC id (0x856014 or 0xB36014: 1 MiB)
   uint32_t size;     // the flash's size
   uint32_t io;       // the most a read moves at once
 };

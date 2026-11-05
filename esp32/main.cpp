@@ -8,9 +8,6 @@
 //   lilsmk.bin      the same for the SMK-37
 //   mflr-loader.bin the loader (loader/), if there's a newer one than the board has in its program: it writes and reads
 //                   the FM-1's flash, and draws the sector map and the percentage on its screen as it goes
-//   chip.txt        what the FM-1's chip said of itself the last time (key=, flash=, size=): the menu shows it
-//   map.txt         the sector map of the last install or backup, one character a sector (. not touched, s the same,
-//                   w written, r read, ! failed), under a line saying which it was
 //   theme.txt       the menus' colors: one of fomajam's themes by name (BLACK, PURPLE, WHITE, ...)
 //   midimap.txt     MIDI routing on the FM-1 (fm1buddy's rules: midimap.h). A line "bluetooth" turns on Bluetooth
 //                   MIDI too, "bluetooth NAME" connects to a Bluetooth MIDI device of that name as well
@@ -50,6 +47,7 @@
 //   log                (serial) log.txt
 //   disk               (serial) the USB drive again
 #include <Arduino.h>
+#include <Preferences.h>
 #include <dirent.h>
 #include <driver/rtc_io.h>
 #include <esp_sleep.h>
@@ -81,7 +79,7 @@
 #define SMK_MARK 0xC1224u
 #define IDLE_MS 120000  // nothing to do for this long: sleep
 #define MENU_MS 600000  // (with the menu up: nothing picked)
-#define VERSION "0.4.2"
+#define VERSION "0.4.3"
 
 #define SERIAL_MODE 0x53455249
 static RTC_NOINIT_ATTR uint32_t serialFlag;  // a restart into the serial port (the drive ejected)
@@ -98,64 +96,43 @@ static Kind kind;
 
 #define say(...) hal::log("lil: " __VA_ARGS__)
 
-// what the FM-1's (or SMK-37's) chip said of itself, the last time it was read or written: the menu's INFO screen shows
-// it (chip.txt on the drive, and `info`'s chip=), as m-flasher's page does
+// what the FM-1's (or SMK-37's) chip said of itself, the last time it was read or written (its key, its flash): in its
+// own flash's NVS, not on the drive (that's the user's), and `info` says it, for the menu's INFO screen
 static bool haveChip;
 static rom::Chip lastChip;
 
 static void chipSave(const rom::Chip& chip) {
   lastChip = chip, haveChip = true;
-  FILE* f = fopen(FS "/chip.txt", "wb");
-  if (f) {
-    fprintf(f, "key=%04X flash=%06X size=%u\n", (unsigned)chip.key, (unsigned)chip.flashId, (unsigned)chip.size);
-    fclose(f);
-  } else {
-    say("Can't write chip.txt to the drive.");
+  Preferences p;
+  if (p.begin("chip", false)) {
+    p.putUShort("key", chip.key);
+    p.putUInt("flash", chip.flashId);
+    p.putUInt("size", chip.size);
+    p.end();
   }
 }
 
 static void chipLoad() {
-  FILE* f = fsOk ? fopen(FS "/chip.txt", "rb") : 0;
-  unsigned key, flash, size;
-  if (f && fscanf(f, "key=%x flash=%x size=%u", &key, &flash, &size) == 3) {
-    lastChip.key = (uint16_t)key, lastChip.flashId = flash, lastChip.size = size, haveChip = true;
-  }
-  if (f) {
-    fclose(f);
+  Preferences p;
+  if (p.begin("chip", true)) {
+    lastChip.key = p.getUShort("key", 0);
+    lastChip.flashId = p.getUInt("flash", 0);
+    lastChip.size = p.getUInt("size", 0);
+    p.end();
+    haveChip = lastChip.flashId != 0;
   }
 }
 
-// the sector map of the job in hand, and of the last one (map.txt): one byte, one of rom::MapState, for each of its 256
-// sectors of 4 KiB
+// the sector map of the job in hand: one byte, one of rom::MapState, for each of its 256 sectors of 4 KiB. Only for the
+// screen: nothing else keeps it (the log says how many were written, how many read)
 static uint8_t sectors[256];
-static char mapWhat[48];  // what it was, for map.txt's first line
-static bool screenOn;     // the loader's own screen (rom::MFLR): the map, and the percentage
+static bool screenOn;  // the loader's screen is up (the map, and the percentage)
 
-static void mapStart(const char* what) {
+static void mapStart() {
   memset(sectors, rom::LMAP_NEW, sizeof sectors);
-  snprintf(mapWhat, sizeof mapWhat, "%s", what);
   screenOn = false;
 }
 
-static void mapSave() {
-  if (!fsOk) {
-    return;
-  }
-  FILE* f = fopen(FS "/map.txt", "wb");
-  if (!f) {
-    return;
-  }
-  fprintf(f, "# %s\n", mapWhat);
-  for (int i = 0; i < 256; i++) {
-    fputc(sectors[i] == rom::LMAP_NEW ? '.' : sectors[i] == rom::LMAP_DIFFERS ? 'd' : sectors[i] == rom::LMAP_WRITTEN ? 'w'
-            : sectors[i] == rom::LMAP_SAME                                        ? 's'
-            : sectors[i] == rom::LMAP_READ                                        ? 'r'
-                                                                              : '!',
-          f);
-  }
-  fputc('\n', f);
-  fclose(f);
-}
 
 // the loader's screen, as the job goes: the percentage on its first row, the sectors under it
 static void mapShow(const char* what, uint32_t done, uint32_t total) {
@@ -263,7 +240,7 @@ static const char* toRom() {
 }
 
 // from a program (device d: the menu, or a firmware that takes the boot ROM's SysEx) to our loader, on the FM-1's
-// chip: 0, or an error. What the chip says of itself is kept (chip.txt)
+// chip: 0, or an error. What the chip says of itself is kept (in its NVS)
 static const char* toLoader(int d, const std::vector<uint8_t>& loader, rom::Chip& chip) {
   const char* e;
   if ((e = rom::enter(d)) || (e = rom::attach(10000))) {
@@ -295,7 +272,7 @@ static const char* backup(int d, const std::vector<uint8_t>& loader) {
   if (disk::freeBytes() < FLASH_SIZE + 65536) {
     return "No room on the drive for a backup.";
   }
-  mapStart("backup");
+  mapStart();
   const char* part = FS "/backup.part";
   bool smk = false;
   led(LED_READING);
@@ -332,7 +309,6 @@ static const char* backup(int d, const std::vector<uint8_t>& loader) {
   struct stat st;
   for (int n = 1; !e && (snprintf(path, sizeof path, FS "/%s-%d.bin", smk ? "smk" : "fm1", n), !stat(path, &st)); n++) {
   }
-  mapSave();
   if (e || rename(part, path)) {
     remove(part);
     return e ? e : "Can't write to the drive.";
@@ -382,7 +358,7 @@ static const char* install(int d, const std::string& file, const std::vector<uin
     want = pkg.image + at;
   }
   led(LED_WRITING);
-  mapStart((std::string("install ") + file).c_str());
+  mapStart();
   rom::Chip chip;
   if ((e = toLoader(d, loader, chip))) {
     return e;
@@ -435,7 +411,6 @@ static const char* install(int d, const std::string& file, const std::vector<uin
   }
   rom::leave();  // (it restarts: into what was written)
   pkg.close();
-  mapSave();
   if (e && written) {
     static std::string err;
     err = std::string(e) + " Press BOOT to try again before switching the FM-1 off.";

@@ -40,8 +40,6 @@ and macOS is told not to make most of them. On the drive:
   way round, and an SMK-37's own calibration is never written
 - `mflr-loader.bin`: ours, if you want a newer one than the board has in its program: it writes and reads the FM-1's
   flash, and draws it on the FM-1's screen as it goes (see `loader/`)
-- `chip.txt`: what the FM-1's chip said of itself the last time (its key, its flash's id and size): the menu shows it
-- `map.txt`: what the last install or backup did, a 4 KiB sector at a time
 - `lilfm1.bin`, `lilsmk.bin`: the menus on the FM-1's and the SMK-37's screens (`picker/`, run from their RAM), for
   the devices you have: the web page puts the latest there, so the board itself rarely needs updating. The board asks
   the running firmware which it is, and loads its menu

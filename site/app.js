@@ -1,6 +1,6 @@
 // lilfm1buddy's page: tabs, the install button's firmware, and the board's USB drive (BOOT on a computer), opened as a
 // folder (File System Access: Chrome, Edge). Its files: *.fwsc firmwares, *.bin backups, lilfm1.bin and lilsmk.bin (the
-// menus), midimap.txt, log.txt, chip.txt, map.txt (esp32/main.cpp)
+// menus), midimap.txt, log.txt (esp32/main.cpp)
 
 const LOADER = 'wl82loader.bin' // (JieLi's: the board doesn't need it any more, and it's kept out of the list)
 const MENUS = { 'lilfm1.bin': 'FM-1', 'lilsmk.bin': 'SMK-37' } // the menus on their screens (picker/): the board needs the one for each device it's used on

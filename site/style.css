@@ -313,6 +313,19 @@ h2 a {
   margin: 0 6px 6px 0;
 }
 
+.maker-switch {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.maker-switch input {
+  width: 1.1em;
+  height: 1.1em;
+  accent-color: var(--accent);
+}
+
 .case select {
   max-width: 100%;
 }

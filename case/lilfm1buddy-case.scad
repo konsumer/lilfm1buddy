@@ -34,6 +34,10 @@ reset_d = 2.5;  // the paperclip's hole
 /* [Battery] */
 bat = [35, 30, 5];  // room under the board: a 503035 (500 mAh) is 35 x 30 x 5
 
+/* [Name] */
+name = true;  // the lid's top face: "lilbuddy" cut into it (Arial Bold's outlines: the browser's OpenSCAD has no fonts)
+name_h = 2.2;  // its x-height
+
 /* [Fit] */
 wall = 1.6;
 floor_t = 1.2;
@@ -51,6 +55,8 @@ PCB = 1.6;  // every board here
 ABOVE = 1.4;  // its BOOT and RESET switches, above the PCB
 UNDER = 1.0;  // its tallest parts underneath (pads, flash)
 USB_H = 3.4;  // its USB-C, around the PCB's middle
+USB_SLOT_W = 13;  // the opening: the plug, and a little of the overmold that comes with it
+USB_SLOT_H = 3.8;  // (the wall above keeps a band to bridge it)
 eps = 0.01;
 
 // --------------------------------------------------------------------------------------------- boards ---
@@ -114,8 +120,51 @@ module base() {
     // the snap grooves, in the outside of both long walls (the lid's skirt clicks into them)
     for (y = [k0.y - wall, k1.y + wall]) ridge([(k0.x + k1.x) / 2, y, groove_z], (k1.x - k0.x) * 0.55, groove_d);
     // the USB-C, through its end (a tunnel, to the board)
-    wall_hole([0, W / 2, shelf_h + PCB / 2], USB_W + 0.6, USB_H);
+    wall_hole([0, W / 2, shelf_h + PCB / 2], max(USB_SLOT_W, USB_W + 0.6), USB_SLOT_H);
     // paperclip holes up through the floor, if asked for
+  }
+}
+
+// "lilbuddy", as the outlines of Arial Bold, flattened and scaled to an x-height of 4: the browser's OpenSCAD has no
+// fonts, and a real face beats any stroke alphabet. Per letter: the character, its advance, its outlines, its counters.
+FONT = [
+  ["l", 2.14, [[[0.55,0],[0.55,5.52],[1.61,5.52],[1.61,0],[0.55,0]]], []],
+  ["i", 2.14, [[[0.55,4.54],[0.55,5.52],[1.61,5.52],[1.61,4.54],[0.55,4.54]],[[0.55,0],[0.55,4],[1.61,4],[1.61,0],[0.55,0]]], []],
+  ["b", 4.71, [[[0.51,0],[0.51,5.52],[1.57,5.52],[1.57,3.53],[1.82,3.78],[2.1,3.95],[2.4,4.06],[2.73,4.09],[3.11,3.96],[3.51,3.58],[3.95,2.94],[4.41,2.41],[4.41,2.54],[4.41,2.41],[4.41,2.04],[4.31,1.52],[4,1],[3.47,0.46],[3,-0.09],[3.09,-0.09],[3,-0.09],[2.74,-0.09],[2.54,-0.05],[2.26,0.08],[1.91,0.29],[1.58,0.46],[1.61,0.42],[1.58,0.46],[1.49,0.59],[1.49,0],[0.51,0]]], [[[1.56,2.09],[1.57,1.8],[1.61,1.55],[1.67,1.34],[1.76,1.17],[1.9,0.98],[2.08,0.85],[2.27,0.77],[2.49,0.75],[2.67,0.82],[2.87,1.06],[3.09,1.44],[3.33,1.75],[3.33,1.67],[3.33,1.75],[3.33,1.99],[3.27,2.33],[3.11,2.65],[2.83,2.97],[2.59,3.28],[2.64,3.28],[2.59,3.28],[2.44,3.28],[2.25,3.21],[2.03,2.98],[1.8,2.61],[1.56,2.31],[1.56,2.39],[1.56,2.31],[1.56,2.09]]]],
+  ["u", 4.71, [[[3.19,0],[3.19,0.6],[3.02,0.44],[2.75,0.27],[2.36,0.09],[2.01,-0.09],[2.06,-0.09],[2.01,-0.09],[1.86,-0.09],[1.63,0.01],[1.33,0.3],[0.96,0.79],[0.64,1.02],[0.67,0.87],[0.64,1.02],[0.53,1.26],[0.53,1.19],[0.53,1.26],[0.53,1.47],[0.53,4],[1.59,4],[1.59,2.16],[1.63,1.76],[1.76,1.38],[1.96,1.03],[2.05,0.8],[1.98,0.83],[2.05,0.8],[2.16,0.72],[2.13,0.72],[2.16,0.72],[2.25,0.72],[2.41,0.82],[2.6,1.11],[2.84,1.61],[3.05,1.83],[3.03,1.66],[3.05,1.83],[3.11,1.99],[3.11,1.88],[3.11,1.99],[3.11,2.31],[3.11,4],[4.17,4],[4.17,0],[3.19,0]]], []],
+  ["d", 4.71, [[[4.22,0],[3.24,0],[3.24,0.59],[3.07,0.42],[2.8,0.25],[2.44,0.08],[2.12,-0.09],[2.16,-0.09],[2.12,-0.09],[1.99,-0.09],[1.63,0.04],[1.23,0.44],[0.79,1.09],[0.32,1.64],[0.32,1.52],[0.32,1.64],[0.32,2.02],[0.42,2.53],[0.74,3.04],[1.27,3.56],[1.73,4.09],[1.64,4.09],[1.73,4.09],[2,4.09],[2.33,4.06],[2.63,3.95],[2.91,3.78],[3.16,3.53],[3.16,5.52],[4.22,5.52],[4.22,0]]], [[[1.4,2.09],[1.41,1.79],[1.44,1.53],[1.5,1.33],[1.57,1.16],[1.72,0.98],[1.88,0.85],[2.07,0.77],[2.29,0.75],[2.48,0.82],[2.69,1.06],[2.92,1.44],[3.17,1.75],[3.17,1.68],[3.17,1.75],[3.17,1.98],[3.11,2.32],[2.95,2.65],[2.67,2.97],[2.43,3.28],[2.48,3.28],[2.43,3.28],[2.28,3.28],[2.09,3.21],[1.87,2.98],[1.64,2.61],[1.4,2.31],[1.4,2.38],[1.4,2.31],[1.4,2.09]]]],
+  ["y", 4.29, [[[0.05,4],[1.18,4],[2.14,1.16],[3.07,4],[4.17,4],[2.75,0.15],[2.5,-0.55],[2.35,-0.74],[2.06,-0.99],[1.61,-1.28],[1.42,-1.49],[1.56,-1.44],[1.42,-1.49],[1.29,-1.58],[1.39,-1.56],[1.29,-1.58],[1.11,-1.62],[1.15,-1.62],[1.11,-1.62],[1,-1.62],[0.85,-1.62],[0.7,-1.61],[0.55,-1.59],[0.4,-1.56],[0.31,-0.73],[0.43,-0.75],[0.55,-0.77],[0.65,-0.78],[0.76,-0.78],[0.95,-0.73],[1.15,-0.59],[1.36,-0.35],[1.54,-0.14],[1.53,-0.18],[1.54,-0.14],[1.57,-0.01],[0.05,4]]], []],
+];
+
+WORD = "lilbuddy";
+function letter(c) = [for (g = FONT) if (g[0] == c) g][0];
+function letter_adv(c) = letter(c)[1];
+function at(i) = i == 0 ? 0 : at(i - 1) + letter_adv(WORD[i - 1]);
+word_len = at(len(WORD) - 1) + letter_adv(WORD[len(WORD) - 1]);  // in the letters' own units (x-height 4)
+word_w = word_len * name_h / 4;
+word_h = 6.6 * name_h / 4;  // (ascender to descender: about 6.6 units)
+
+module letter_2d(c) {
+  difference() {
+    for (o = letter(c)[2]) polygon(o);
+    for (h = letter(c)[3]) polygon(h);
+  }
+}
+
+module name_shape() {  // on the baseline at y = 0, from x = 0
+  for (i = [0 : len(WORD) - 1]) translate([at(i), 0]) letter_2d(WORD[i]);
+}
+
+// cut into the lid's top face: the lid prints top face down, so this is a recess in the bed's side, and reads from above.
+// Across the lid if the word fits beside the button; turned along it if not (a small case)
+module name_cut() {
+  free_x = k1.x - (boot.x + (btn_d + 2) / 2 + 2.5) - 1.5;
+  along = free_x >= word_w + 2.5;
+  cx = along ? (boot.x + (btn_d + 2) / 2 + 2.5 + k1.x - 1.5) / 2 : k1.x - wall - 1.5 - word_h / 2;
+  cy = (k0.y + k1.y) / 2;
+  translate([cx, cy, lid_t - 0.6]) {
+    if (along) translate([-word_w / 2, -word_h / 2 + 1.1]) scale(name_h / 4) linear_extrude(1.6 / (name_h / 4)) name_shape();
+    else rotate([0, 0, 90]) translate([-word_w / 2, -word_h / 2 + 1.1]) scale(name_h / 4) linear_extrude(1.6 / (name_h / 4)) name_shape();
   }
 }
 
@@ -140,6 +189,10 @@ module lid() {
         translate([k0.x - wall, y < W / 2 ? y - 5 : y, -4.2]) cube([k1.x - k0.x + 2 * wall, 5, 4.2]);
       }
     }
+    // the same opening, through the skirt (it wraps the walls, and would otherwise cover it)
+    translate([k0.x - wall - 1, W / 2 - USB_SLOT_W / 2, shelf_h + PCB / 2 - USB_SLOT_H / 2 - inner_h])
+      cube([wall + 2, USB_SLOT_W, USB_SLOT_H + 0.1]);
+    if (name) name_cut();
     // BOOT's hole (its edge chamfered, the button's plug goes in from outside); RESET's, for a paperclip
     translate([boot.x, boot.y, -1]) cylinder(d = btn_d, h = lid_t + 2);
     translate([boot.x, boot.y, -0.6]) cylinder(d1 = btn_d + 0.8, d2 = btn_d, h = 0.6);
@@ -175,11 +228,6 @@ module stand_in(shrink = 0) {
   for (b = [boot, reset]) translate([b.x, b.y, board_top + (ABOVE - 0.1) / 2]) color("#666") cube([4.4, 4.4, ABOVE - 0.1], center = true);
   color("#aaa") translate([-USB_OUT + 0.1, W / 2 - USB_W / 2 + 0.1, shelf_h + PCB / 2 - USB_H / 2 + 0.1]) cube([3, USB_W - 0.2, USB_H - 0.2]);
   if (battery) translate([k0.x + 0.4, k0.y + 0.4, 0.4]) color("silver") cube([min(bat.x, L + 2 * gap - 0.8), min(bat.y, W + 2 * gap - 0.8), bat.z]);
-}
-
-// printed flange down: the same, flipped about the flange's top
-module button_print() {
-  translate([0, 0, lid_top + FLANGE]) mirror([0, 0, 1]) button_case();
 }
 
 module cut() {

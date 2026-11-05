@@ -176,6 +176,7 @@ export function init() {
   const $ = (s) => box.querySelector(s)
   const boardSel = $('[name=board]')
   const batterySel = $('[name=battery]')
+  const nameBox = $('[name=name]')
   const status = $('.maker-status')
   const canvas = $('canvas')
   const buttons = {}
@@ -212,6 +213,7 @@ export function init() {
       boot: list(b.boot),
       reset: list(b.reset),
       ...(b.btn ? { btn_d: nm(b.btn) } : {}),
+      name: nameBox.checked ? 'true' : 'false',
       battery: bat ? 'true' : 'false'
     }
     if (bat) {
@@ -243,7 +245,7 @@ export function init() {
     try {
       view ||= await viewer(canvas)
       made = {}
-      const sig = `${board().id}|${battery().size ? battery().size.join('x') : 'none'}`
+      const sig = `${board().id}|${battery().size ? battery().size.join('x') : 'none'}|${nameBox.checked}`
       const d = defines('base')
       // the view: the case around a stand-in for the board (and the battery)
       view.set('base', await piece('base', d, sig), BASE)
@@ -292,6 +294,7 @@ export function init() {
     make()
   }
   batterySel.onchange = make
+  nameBox.onchange = make
 
   // at the first look at it
   new IntersectionObserver(

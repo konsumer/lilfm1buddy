@@ -1,4 +1,4 @@
-import { init as initMaker } from './casemaker.js?v=8'
+import { init as initMaker } from './casemaker.js?v=9'
 
 // lilfm1buddy's page: tabs, the install button's firmware, the case, and the board's USB drive (BOOT on a computer), opened as a
 // folder (File System Access: Chrome, Edge). Its files: *.fwsc firmwares, *.bin backups, lilfm1.bin and lilsmk.bin (the

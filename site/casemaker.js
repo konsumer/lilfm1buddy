@@ -11,7 +11,7 @@ const SCAD = ['fw/lilfm1buddy-case.scad', 'https://raw.githubusercontent.com/kon
 // USB-C end, mirrored across the width. The other two publish no PCB data (Waveshare a STEP model, Espressif an
 // outline DXF): theirs are estimates.
 const BOARDS = [
-  { id: 'xiaoplus', name: 'XIAO ESP32S3 Plus', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], btn: 10, src: 'Seeed’s KiCad' },
+  { id: 'xiaoplus', name: 'XIAO ESP32S3 Plus', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], btn: 7, src: 'Seeed’s KiCad' },
   { id: 'xiao', name: 'XIAO ESP32S3', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], src: 'Seeed’s KiCad' },
   { id: 'zero', name: 'Waveshare ESP32-S3-Zero', l: 23.5, w: 18, boot: [4.5, 5.2], reset: [4.5, 12.6], btn: 8, src: 'a guess: measure' },
   { id: 'devkit', name: 'ESP32-S3 DevKitC (no headers)', l: 52, w: 25.4, boot: [5, 6], reset: [5, 19], btn: 8, src: 'a guess: measure' }
@@ -211,7 +211,7 @@ export function init() {
       board: `"${b.id}"`,
       boot: list(b.boot),
       reset: list(b.reset),
-      btn_d: nm(b.btn),
+      ...(b.btn ? { btn_d: nm(b.btn) } : {}),
       battery: bat ? 'true' : 'false'
     }
     if (bat) {

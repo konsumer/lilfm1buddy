@@ -139,8 +139,9 @@ numbers that can't work (a button whose cap would reach
 RESET's switch, a battery bigger than the case, a switch off the board), and it has its own fit test:
 `openscad -D 'part="fit"' case/lilfm1buddy-case.scad` must come out empty (it does for each preset).
 
-The board sits **4.5 mm back** from the USB-C wall (`usb_inset`), so a 10 mm BOOT cap over a switch that close to the
-board's end has room; the USB-C gets a 4.9 mm tunnel through the wall.
+The board sits **4.5 mm back** from the USB-C wall (`usb_inset`), so the BOOT button over a switch that close to the
+board's end has room; the USB-C gets a 4.9 mm tunnel through the wall. Its cap is 7 mm and pressed into the lid — the
+switches sit about 3 mm from their boards' long edges, where a snap's ring would have to hang under the wall.
 
 `tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`
 (mounts its drive, prints where), `eject` (its serial port), `flash ENV` (installs the program, then it's the drive

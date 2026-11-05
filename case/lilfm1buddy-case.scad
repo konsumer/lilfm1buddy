@@ -28,7 +28,7 @@ usb_inset = 4.5;  // how far the board sits back from the USB-C wall: a big BOOT
 // from the USB-C end, and mirrored across the width, 3.05 mm from their long edges.
 boot = [1.65, 3.05];  // BOOT's centre: from the USB-C end, from the left wall
 reset = [1.65, 14.73];
-btn_d = 10;  // the BOOT button's cap: the lid's hole is this wide (and it must not reach RESET's switch)
+btn_d = 7;  // the BOOT button's cap: the lid's hole is this wide (it has to fit between the switch and the case's edge)
 reset_d = 2.5;  // the paperclip's hole
 
 /* [Battery] */
@@ -140,29 +140,25 @@ module lid() {
         translate([k0.x - wall, y < W / 2 ? y - 5 : y, -4.2]) cube([k1.x - k0.x + 2 * wall, 5, 4.2]);
       }
     }
-    // BOOT's hole, with the groove its fingers snap into; RESET's, for a paperclip
+    // BOOT's hole (its edge chamfered, the button's plug goes in from outside); RESET's, for a paperclip
     translate([boot.x, boot.y, -1]) cylinder(d = btn_d, h = lid_t + 2);
-    translate([boot.x, boot.y, -FINGER - 0.05]) cylinder(d = btn_d + 2.2, h = FINGER + 0.05);
+    translate([boot.x, boot.y, -0.6]) cylinder(d1 = btn_d + 0.8, d2 = btn_d, h = 0.6);
     translate([reset.x, reset.y, -1]) cylinder(d = reset_d, h = lid_t + 2);
     translate([reset.x, reset.y, -1]) cylinder(d = reset_d + 1.0, h = 0.45);
   }
 }
 
 // -------------------------------------------------------------------------------------- the button ---
-// in the case's own frame: a flange on the lid, a plug through its hole, four fingers in the recess under it (clear of
-// the switch, which is small), and a stem that comes down onto the switch. Printed flange down (z 0: the bed)
+// in the case's own frame: a flange on the lid, a plug pressed into its hole, and a stem that comes down onto the
+// switch. Pressed in, not clicked: the switches are close to the boards' edges, where a snap's ring would have to hang
+// under the wall. Printed flange down (z 0: the bed)
 FLANGE = 1.0;
-FINGER = 0.6;
+PRESS = 0.15;  // how much wider the plug is than the hole: the lid's plate gives a little, and it holds
 lid_top = inner_h + lid_t;
 module button_case() {
   translate([boot.x, boot.y, 0]) union() {
-    translate([0, 0, lid_top]) cylinder(d = btn_d + 2.6, h = FLANGE);  // on the lid, to press
-    translate([0, 0, inner_h]) cylinder(d = btn_d - 0.2, h = lid_t);  // the plug, through the hole
-    translate([0, 0, inner_h - FINGER]) difference() {  // the fingers, in the recess (they bend in on the way through)
-      cylinder(d = btn_d + 1.6, h = FINGER);
-      translate([0, 0, -eps]) cylinder(d = btn_d - 0.8, h = FINGER + 2 * eps);
-      for (a = [0, 90]) rotate([0, 0, a]) translate([-0.7, -btn_d, -eps]) cube([1.4, 2 * btn_d, FINGER + 2 * eps]);
-    }
+    translate([0, 0, lid_top]) cylinder(d = btn_d + 2.0, h = FLANGE);  // on the lid, to press
+    translate([0, 0, inner_h - eps]) cylinder(d = btn_d + PRESS, h = lid_t + 2 * eps);  // pressed into the hole
     translate([0, 0, board_top + ABOVE]) cylinder(d = 3.4, h = inner_h - board_top - ABOVE + 0.15);  // onto the switch
   }
 }
@@ -234,7 +230,11 @@ assert(!battery || (bat.x <= L + 2 * gap - 0.4 && bat.y <= W + 2 * gap - 0.4), "
 assert(!battery || bat.z > 0, "the battery needs a thickness");
 assert(boot.x > 0 && boot.x < L && boot.y > 0 && boot.y < W, "BOOT isn't on the board");
 assert(reset.x > 0 && reset.x < L && reset.y > 0 && reset.y < W, "RESET isn't on the board");
-assert(btn_d > 5 && btn_d < min(L, W), "the button's cap doesn't fit the board");
-// the cap's fingers, and RESET's switch (4.4 square: 2.2 from its centre), mustn't touch: pressing BOOT must not press
-// RESET. (The switches are the board's; moving BOOT or RESET, or a smaller cap, is the fix.)
-assert(norm(boot - reset) >= (btn_d + 1.6) / 2 + 2.2 + 0.3, "the BOOT button's cap would reach RESET's switch: move one of them, or make the cap smaller");
+assert(btn_d > 4 && btn_d < min(L, W), "the button's cap doesn't fit the board");
+// its flange, on the lid, has to be inside the lid's edge (and clear of the wall's top: nothing hangs under it)
+assert(min(boot.y - k0.y + wall + 0.3, k1.y - boot.y + wall + 0.3, boot.x - k0.x + wall + 0.3, k1.x - boot.x + wall + 0.3) >=
+           (btn_d + 2) / 2 + 0.3,
+       "the BOOT button's cap would hang over the case's edge: the switch is too close to it");
+// the cap, and RESET's switch (4.4 square: 2.2 from its centre), mustn't touch: pressing BOOT must not press RESET.
+// (The switches are the board's; moving BOOT or RESET, or a smaller cap, is the fix.)
+assert(norm(boot - reset) >= (btn_d + 2) / 2 + 2.2 + 0.3, "the BOOT button's cap would reach RESET's switch: move one of them, or make the cap smaller");

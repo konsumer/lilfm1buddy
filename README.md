@@ -12,16 +12,19 @@ Working on hardware (2026-10-30): fomajam and baudgirl installed from the FM-1's
 
 ## You need
 
-- a [Seeed XIAO ESP32S3 Plus](https://www.aliexpress.us/item/3256808143430495.html): 21 × 18 mm, room for about 20
-  firmwares, a battery charger on board, and it reads its battery (the FM-1 shows its level)
-- a [3.7 V 180 mAh LiPo with bare wires](https://www.aliexpress.us/item/3256802077349750.html), soldered to the BAT+
+- an ESP32-S3 board with PSRAM. Recommended: a [Seeed XIAO ESP32S3 Plus](https://www.aliexpress.us/item/3256808143430495.html):
+  21 × 18 mm, room for about 20 firmwares, a battery charger on board, and it reads its battery (the FM-1 shows its
+  level). Much cheaper boards work too, with less room (see [Build](#build)): the XIAO ESP32S3, the Waveshare
+  ESP32-S3-Zero, or any ESP32-S3 DevKit N16R8
+- optional: a [3.7 V 180 mAh LiPo with bare wires](https://www.aliexpress.us/item/3256802077349750.html), soldered to the BAT+
   and BAT− pads on the XIAO's back. Check the polarity with a meter first: the wire colours on these aren't always
-  right. A firmware switch takes a few mAh; the XIAO charges it from its USB-C (its red LED flashes while it does)
+  right. A firmware switch takes a few mAh; the XIAO charges it from its USB-C (its red LED flashes while it does).
+  Without one, it works fine powered over USB
 
 No power switch: when it's done, or nothing happens for a while (two minutes with nothing to do, ten for a pick), the
-board goes to deep sleep, months on that battery. **Its BOOT button (or reset) wakes it.**
+board goes to deep sleep, months on a battery. **Its BOOT button (or reset) wakes it.**
 
-The board is the FM-1's USB host: each on its own battery, one USB-C data cable between them (or a powered hub).
+The board is the FM-1's USB host: one USB-C data cable between them (or a powered hub).
 
 ## Use it
 

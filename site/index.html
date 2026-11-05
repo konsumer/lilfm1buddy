@@ -13,6 +13,7 @@
       <div class="wrap">
         <h1>lilfm1buddy</h1>
         <p class="lede">Switch the M-VAVE FM-1's firmware from the FM-1 itself: a tiny ESP32-S3 on its USB port, a menu on its screen, no computer.</p>
+        <p>The little sibling of <a href="https://konsumer.js.org/fm1buddy/">fm1buddy</a>.</p>
         <p id="release" class="release"></p>
         <div class="video">
           <iframe src="https://www.youtube-nocookie.com/embed/AldMaSVyI7o" title="lilfm1buddy video" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
@@ -32,16 +33,16 @@
           <h2>You need</h2>
           <ul>
             <li>
-              <a href="https://www.aliexpress.us/item/3256808143430495.html"><strong>Seeed XIAO ESP32S3 Plus</strong></a
-              >: 21 × 18 mm, room for about 20 firmwares, a battery charger on board, and it reads its battery (the FM-1 shows its level). Its LED blinks what it's doing.
+              <strong>An ESP32-S3 board with PSRAM.</strong> Recommended: the <a href="https://www.aliexpress.us/item/3256808143430495.html"><strong>Seeed XIAO ESP32S3 Plus</strong></a
+              >: 21 × 18 mm, room for about 20 firmwares, a battery charger on board, and it reads its battery (the FM-1 shows its level). Its LED blinks what it's doing. Much cheaper boards work too, with room for fewer firmwares: the Seeed XIAO ESP32S3 (8 MB, about 10 firmwares), the Waveshare ESP32-S3-Zero (4 MB, about 5 firmwares, or 3 backups), or any ESP32-S3 DevKit N16R8 (16 MB).
             </li>
             <li>
-              <a href="https://www.aliexpress.us/item/3256802077349750.html"><strong>a 3.7 V 180 mAh LiPo with bare wires</strong></a
-              >: solder it to the BAT+ and BAT− pads on the XIAO's back. <strong>Check the polarity with a meter first</strong>: the wire colours on these aren't always right. A firmware switch takes a few mAh, and the XIAO charges it from its USB-C (its red LED flashes while it does, and goes out when it's full).
+              <strong>Optional:</strong> <a href="https://www.aliexpress.us/item/3256802077349750.html"><strong>a 3.7 V 180 mAh LiPo with bare wires</strong></a
+              >, so it runs on its own battery. Without one, it works fine powered over USB. To add one, solder it to the BAT+ and BAT− pads on the XIAO's back. <strong>Check the polarity with a meter first</strong>: the wire colours on these aren't always right. A firmware switch takes a few mAh, and the XIAO charges it from its USB-C (its red LED flashes while it does, and goes out when it's full).
             </li>
             <li>Chrome or Edge on a computer, and a USB-C cable that carries data</li>
           </ul>
-          <p>No power switch: when it's done, or nothing happens for a while, the board goes to deep sleep (months on that battery). <strong>Press its BOOT button (or reset) to wake it.</strong></p>
+          <p>No power switch: when it's done, or nothing happens for a while, the board goes to deep sleep (months on a battery). <strong>Press its BOOT button (or reset) to wake it.</strong></p>
           <p class="note"><strong>Already set up?</strong> You don't need to install again: the program on the board doesn't change. An update is just the files on its drive, the menus (<code>lilfm1.bin</code>, <code>lilsmk.bin</code>) and JieLi's loader (<code>wl82loader.bin</code>): get them on the <a href="#drive" data-tab="drive">Drive</a> tab.</p>
           <h2>1. The program</h2>
           <p>Pick your board, and plug it into this computer. A new board: hold its BOOT button, tap reset, and let go (its download mode). One with lilfm1buddy on it: if its <code>LILBUDDY</code> drive shows up on this computer, <strong>eject it first</strong> (its LED goes blue: it's ready to install). Then press Install. A new board, or one with lilfm1buddy 0.1 on it: let it erase. To update one, don't: its files stay. Then tap reset.</p>
@@ -177,7 +178,7 @@
           </table>
           <p>The XIAO's LED is one colour: the same blinks, without the colours.</p>
           <p>Until something is picked nothing is written: to keep what's on it, switch the FM-1 off and on. Only the firmware's own image is written, never the flash's head (what the chip starts from), and the chip's boot loader is in its ROM: nothing here can make it unrecoverable.</p>
-          <p>How it works, and the code: <a href="https://github.com/konsumer/lilfm1buddy">lilfm1buddy</a>. Its bigger sibling, with a touch screen and Wi-Fi: <a href="https://konsumer.github.io/fm1buddy/">fm1buddy</a>.</p>
+          <p>How it works, and the code: <a href="https://github.com/konsumer/lilfm1buddy">lilfm1buddy</a>. Its bigger sibling, with a touch screen and Wi-Fi: <a href="https://konsumer.js.org/fm1buddy/">fm1buddy</a>.</p>
         </section>
       </div>
     </main>

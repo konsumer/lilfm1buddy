@@ -44,8 +44,6 @@ jobs:
             mkdir -p ~/pi32v2 && tar -xJf /tmp/pi32v2.tar.xz -C ~/pi32v2 --strip-components=1
           fi
       - run: PI32V2_TOOLCHAIN=~/pi32v2 loader/build.sh
-      - name: the loader in the board's program is the one it's built from
-        run: git diff --exit-code esp32/mflr_loader.h
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

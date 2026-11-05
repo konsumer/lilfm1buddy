@@ -20,6 +20,11 @@ Build it (the toolchain is [pi32v2-llvm](https://github.com/jvitkauskas/pi32v2-l
 PI32V2_TOOLCHAIN=~/pi32v2-llvm loader/build.sh   # build/mflr-loader.bin, and esp32/mflr_loader.h (in the board's program)
 ```
 
+`esp32/mflr_loader.h` is the same bytes, in the board's program: commit it with the sources. Its build isn't the
+same on every host (a few bytes of padding: 6312 on macOS arm64, 6316 on Linux x64, both fine), so CI builds the
+loader but doesn't compare the header byte for byte: run `loader/build.sh` and commit the header after changing
+anything here.
+
 The board has the loader in its program, so nothing has to be put on its drive (and no page, no Wi-Fi). A
 `mflr-loader.bin` on the drive is used instead, if there is one: a newer build, to try without flashing the board.
 JieLi's `wl82loader.bin`, if it's on the drive, is the second thing tried, if ours doesn't start.

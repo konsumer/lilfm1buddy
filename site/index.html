@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>lilfm1buddy</title>
     <meta name="description" content="Switch the M-VAVE FM-1's firmware from the FM-1 itself, with a tiny ESP32-S3 on its USB port." />
-    <link rel="stylesheet" href="style.css?v=4" />
+    <link rel="stylesheet" href="style.css?v=5" />
     <!-- the case's 3D view and its OpenSCAD, for the Case tab (casemaker.js) -->
     <script type="importmap">
       {
@@ -131,7 +131,7 @@
         <section class="panel">
           <h2>The case</h2>
           <p>Three printed pieces, snap-fit, no screws: the base, the lid, and the BOOT button's own insert (so the button is a separate colour, and prints without supports). The lid clicks onto the walls and its ribs hold the board down on its shelf; RESET is a paperclip hole.</p>
-          <p class="note">Pick the board and whether there's a battery: the case's size, where its holes go and how big the button is all follow from those. Print the <strong>check plate</strong> first (about a minute, the board's own outline with the two holes), lay it on the board, and see that the holes sit over BOOT and RESET – see <a href="#measure">where the numbers come from</a>.</p>
+          <p class="note">Pick the board and whether there's a battery: the case's size, where its holes go and how big the button is all follow from those. Print the <strong>check plate</strong> first (about a minute, the board's own outline with the two holes), lay it on the board, and see that the holes sit over BOOT and RESET.</p>
           <div class="case" id="maker">
             <div class="case-view">
               <canvas hidden aria-label="The case in 3D: drag to turn it"></canvas>
@@ -158,35 +158,6 @@
               <p class="note maker-status"></p>
             </div>
           </div>
-
-          <h2 id="measure">Where the numbers come from</h2>
-          <table class="words">
-            <thead>
-              <tr>
-                <th>Board</th>
-                <th>Outline</th>
-                <th>BOOT and RESET</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>XIAO ESP32S3, XIAO ESP32S3 Plus</td>
-                <td>21.15 × 17.78 mm</td>
-                <td><a href="https://files.seeedstudio.com/wiki/SeeedStudio-XIAO-ESP32S3/res/XIAO_ESP32S3_Plus_V1.1_KiCad_260115.zip">Seeed's published KiCad of the Plus</a> (and of the <a href="https://files.seeedstudio.com/wiki/SeeedStudio-XIAO-ESP32S3/new-res/202003751_XIAO%20ESP32S3_v1.4_SCH%26PCB_260226.zip">XIAO</a>): both switches <strong>1.65 mm</strong> from the USB-C end, mirrored across the width (<strong>3.05</strong> and <strong>14.73 mm</strong> from the long edges; K1 is RESET, K2 is BOOT). Those are the numbers the page starts with.</td>
-              </tr>
-              <tr>
-                <td>Waveshare ESP32-S3-Zero</td>
-                <td>24.8 × 18 mm (23.5 PCB, the USB-C out 1.3)</td>
-                <td>Waveshare publishes a <a href="https://files.waveshare.com/wiki/ESP32-S3-Zero/ESP32-S3-Zero_v2-138eb3753cf14afa3252058c380ca416.stp">STEP model</a>, not a board layout: the numbers are a guess. Measure with the check plate, or a caliper.</td>
-              </tr>
-              <tr>
-                <td>ESP32-S3 DevKitC-1 (no headers)</td>
-                <td>25.4 × 52 mm</td>
-                <td>Espressif publishes a <a href="https://dl.espressif.com/dl/schematics/esp_idf/DXF_ESP32-S3-DevKitC-1_V1.1_20220429.dxf">DXF of the outline</a>, not the switches: a guess too. Measure.</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="note">The two XIAO switches are mirrored across the board's width. If the check plate's holes come out swapped (its big hole over RESET), the case is mirrored too: say so and we'll flip the numbers (or change <code>boot</code>/<code>reset</code> in <code>case/lilfm1buddy-case.scad</code>).</p>
 
           <h2>Printing it</h2>
           <table class="words">
@@ -298,6 +269,6 @@
         </section>
       </div>
     </main>
-    <script type="module" src="app.js?v=4"></script>
+    <script type="module" src="app.js?v=5"></script>
   </body>
 </html>

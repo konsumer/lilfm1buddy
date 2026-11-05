@@ -43,7 +43,7 @@
             <li>Chrome or Edge on a computer, and a USB-C cable that carries data</li>
           </ul>
           <p>No power switch: when it's done, or nothing happens for a while, the board goes to deep sleep (months on a battery). <strong>Press its BOOT button (or reset) to wake it.</strong></p>
-          <p class="note"><strong>Already set up?</strong> You don't need to install again: the program on the board doesn't change. An update is just the files on its drive, the menus (<code>lilfm1.bin</code>, <code>lilsmk.bin</code>) and JieLi's loader (<code>wl82loader.bin</code>): get them on the <a href="#drive" data-tab="drive">Drive</a> tab.</p>
+          <p class="note"><strong>Already set up?</strong> You don't need to install again: the program on the board doesn't change. An update is just the files on its drive, the menus (<code>lilfm1.bin</code>, <code>lilsmk.bin</code>): get them on the <a href="#drive" data-tab="drive">Drive</a> tab.</p>
           <h2>1. The program</h2>
           <p>Pick your board, and plug it into this computer. A new board: hold its BOOT button, tap reset, and let go (its download mode). One with lilfm1buddy on it: if its <code>LILBUDDY</code> drive shows up on this computer, <strong>eject it first</strong> (its LED goes blue: it's ready to install). Then press Install. A new board, or one with lilfm1buddy 0.1 on it: let it erase. To update one, don't: its files stay. Then tap reset.</p>
           <p class="bad"><strong>Erasing deletes everything on its drive</strong>, backups too: copy them to your computer first.</p>
@@ -64,7 +64,7 @@
           <p id="nofw" class="bad" hidden>No build yet: the page has no firmware next to it.</p>
           <h2>2. JieLi's loader, and firmwares</h2>
           <p>On a computer the board is a USB drive, <code>LILBUDDY</code> (its LED cyan). Put <code>.fwsc</code> firmwares on it (drag them there, or from the Drive tab). Eject it when you're done.</p>
-          <p>The board writes the FM-1's flash with the loader JieLi made for its chip (<code>wl82loader.bin</code>). It isn't ours to hand out: the Drive tab gets it from <a href="https://github.com/kagaimiq/jl-uboot-tool">jl-uboot-tool</a>, checks it, and puts it on the drive.</p>
+          <p>The board carries its own loader for the FM-1's flash, and draws the flash's sectors on the FM-1's screen as it writes or reads. JieLi's (<code>wl82loader.bin</code>, from <a href="https://github.com/kagaimiq/jl-uboot-tool">jl-uboot-tool</a>) isn't needed; on the drive, it's the second thing the board tries, if its own doesn't start.</p>
           <p><a href="#drive" class="button" data-tab="drive">Go to Drive</a></p>
         </section>
       </div>

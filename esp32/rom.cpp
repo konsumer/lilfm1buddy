@@ -158,14 +158,20 @@ const char* rom::run(uint32_t addr, const uint8_t* image, uint32_t n) {
   return "Its boot ROM is still there: the jump didn't happen.";
 }
 
-const char* rom::loader(const uint8_t* image, uint32_t n, Chip& chip) {
-  if (!writeMemory(LOADER_AT, image, n, false)) {
-    return "Its boot ROM didn't take JieLi's loader.";
+const rom::Loader rom::JIELI = {"wl82loader.bin", LOADER_AT, false, false, LOADER_SIZE};
+const rom::Loader rom::MFLR = {"mflr-loader.bin", 0x01C20000u, true, true, 0x8000u};
+
+const char* rom::loader(const Loader& l, const uint8_t* image, uint32_t n, Chip& chip) {
+  if (!n || n > l.max) {
+    return "That loader is a size it can't be.";
+  }
+  if (!writeMemory(l.at, image, n, l.plain)) {
+    return "Its boot ROM didn't take the loader.";
   }
   // run it; it's running when it answers READ_KEY (the jump's own answer may be lost, and the loader doesn't know
   // JUMP: so it's asked only until the loader answers)
   uint8_t args[6], key[4], resp[16];
-  be32(args, LOADER_AT);
+  be32(args, l.at);
   args[4] = 0, args[5] = 1;
   be32(key, 0x00AC6900);
   bool running = false;
@@ -174,14 +180,21 @@ const char* rom::loader(const uint8_t* image, uint32_t n, Chip& chip) {
     running = exec(READ_KEY, key, 4, resp);
   }
   if (!running) {
-    return "JieLi's loader didn't start.";
+    return "The loader didn't start.";
   }
   uint8_t k[2] = {resp[7], resp[6]};  // its answer's 4th and 5th, the other way round, deciphered
   cipher(k, 2);
   chip.key = k[0] | k[1] << 8;
+  if (chip.key != FM1_KEY) {  // (ours, as the owner's chip key reads it: unscrambled)
+    uint16_t raw = resp[7] | resp[6] << 8;
+    if (raw == FM1_KEY) {
+      chip.key = raw;
+    }
+  }
+  hal::log("rom: %s running", l.name);
   if (!exec(GET_ONLINE_DEVICE, 0, 0, resp)) {
     leave();
-    return "JieLi's loader didn't say what flash it has.";
+    return "The loader didn't say what flash it has.";
   }
   chip.flashId = resp[4] | resp[5] << 8 | resp[6] << 16 | (uint32_t)resp[7] << 24;
   uint8_t cap = chip.flashId & 0xFF;  // JEDEC: its size, as a power of 2
@@ -206,6 +219,41 @@ const char* rom::loader(const uint8_t* image, uint32_t n, Chip& chip) {
   hal::log("rom: chip key %04X, flash %06X (%u KiB), reads of %u", chip.key, (unsigned)chip.flashId,
            (unsigned)chip.size / 1024, (unsigned)chip.io);
   return 0;
+}
+
+// ---- the loader's own screen (Loader::screen): the FM-1's panel, drawn while it reads and writes ----
+bool rom::screenInit(uint32_t board) {
+  uint8_t args[1] = {(uint8_t)board}, resp[16];
+  bool ok = exec(0xFC43, args, sizeof args, resp) && resp[2] == 1;
+  hal::log("rom: screen %u: %s", (unsigned)board, ok ? "on" : "it didn't come");
+  return ok;
+}
+
+bool rom::screenRow(uint32_t row, uint16_t fg, uint16_t bg, const char* text) {
+  uint32_t n = strlen(text);
+  if (n > 20) {
+    n = 20;  // (a row is 20 cells)
+  }
+  uint8_t args[7] = {(uint8_t)row, (uint8_t)(fg >> 8), (uint8_t)fg, (uint8_t)(bg >> 8), (uint8_t)bg,
+                     (uint8_t)(n >> 8), (uint8_t)n};
+  uint8_t cdb[16];
+  cdbOf(cdb, 0xFC44, args, sizeof args);
+  bool ok = hal::storageCommand(cdb, 16, false, (uint8_t*)text, n, 0, 1000);
+  if (!ok) {
+    hal::log("rom: screen row %u didn't take", (unsigned)row);
+  }
+  return ok;
+}
+
+bool rom::screenMap(const uint8_t* states) {
+  uint8_t args[7] = {0, 0, 0, 0, 0, 1, 0};  // (the length it declares: 256, one a sector)
+  uint8_t cdb[16];
+  cdbOf(cdb, 0xFC47, args, sizeof args);
+  bool ok = hal::storageCommand(cdb, 16, false, (uint8_t*)states, 256, 0, 1000);
+  if (!ok) {
+    hal::log("rom: the screen's map didn't take");
+  }
+  return ok;
 }
 
 const char* rom::read(const Chip& chip, uint32_t addr, uint8_t* out, uint32_t n) {

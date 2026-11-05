@@ -33,6 +33,28 @@ struct Chip {
   uint32_t io;       // the most a read moves at once
 };
 
+// A program that runs in the ROM's place, where the ROM hands its USB storage commands to it: the FM-1's flash, and
+// its boot ROM's jobs. JieLi's (wl82loader.bin), or ours (mflr-loader.bin: m-bootloader's, with the FM-1's screen)
+struct Loader {
+  const char* name;  // its file on the drive
+  uint32_t at;       // where it links, and is run
+  bool plain;        // a plain image (the ROM ciphers it), or as it comes (already ciphered)
+  bool screen;       // it can draw on the FM-1's (or SMK-37's) screen itself: the map, and what's going on
+  uint32_t max;      // the most it may be
+};
+extern const Loader JIELI;   // JieLi's: what its firmware's flashers use
+extern const Loader MFLR;    // ours: the same commands, and the screen (loader/)
+
+// the map's states, one for each of its 256 sectors (screenMap)
+enum MapState : uint8_t {
+  LMAP_NEW,      // not touched
+  LMAP_DIFFERS,  // to write
+  LMAP_WRITTEN,
+  LMAP_SAME,   // already what it should be
+  LMAP_READ,   // read (a backup)
+  LMAP_FAILED,
+};
+
 // a running FM-1 (MIDI device d) into its boot ROM, by SysEx (stock V15, Felucca-based firmwares, the menu); 0 or
 // an error
 const char* enter(int d);
@@ -40,9 +62,13 @@ const char* enter(int d);
 const char* attach(uint32_t ms);
 // image (plain, as the build makes it) into RAM at addr, then jump there; 0 or an error
 const char* run(uint32_t addr, const uint8_t* image, uint32_t n);
-// JieLi's loader (wl82loader.bin as it comes: already ciphered) into RAM and started, and what it says of the chip;
-// 0 or an error
-const char* loader(const uint8_t* image, uint32_t n, Chip& chip);
+// a loader into RAM and started, and what it says of the chip; 0 or an error
+const char* loader(const Loader& l, const uint8_t* image, uint32_t n, Chip& chip);
+// the loader's own screen (Loader::screen, after loader()): the panel (1: the FM-1, 2: the SMK-37), a row of 20
+// cells (row 0..14), and the flash's 256 sectors; false if it didn't take it
+bool screenInit(uint32_t board);
+bool screenRow(uint32_t row, uint16_t fg, uint16_t bg, const char* text);
+bool screenMap(const uint8_t* states);
 // with the loader running: n bytes of its flash from addr; one sector, erased, written and read back; back to its
 // firmware
 const char* read(const Chip& chip, uint32_t addr, uint8_t* out, uint32_t n);

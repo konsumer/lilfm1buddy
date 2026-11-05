@@ -171,9 +171,56 @@
                 <a class="button secondary maker-download" data-part="button" aria-disabled="true">BOOT button</a>
               </div>
               <p class="note maker-status"></p>
-              <p class="note">PLA or PETG, 0.4 mm nozzle, 2 walls: the base open side up, the lid as it is (its skirt up), the button flange down. With a battery it goes under the board, on its <code>BAT</code> pads: check the polarity, and that the leads reach before closing the lid.</p>
             </div>
           </div>
+
+          <h2>Printing it</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>What it is</th>
+                <th>How it sits on the bed</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Check plate</td>
+                <td>the lid's outline, 1.2 mm, with just the two holes</td>
+                <td>flat, either side up &mdash; <strong>print this first</strong>, lay it on the board and use it to place the holes</td>
+              </tr>
+              <tr>
+                <td>Base</td>
+                <td>floor, walls, the shelf for the board, the USB-C opening</td>
+                <td>open side <strong>up</strong>, as it comes: don't turn it over</td>
+              </tr>
+              <tr>
+                <td>Lid</td>
+                <td>the plate, and the skirt whose ridges snap onto the walls</td>
+                <td><strong>top face down</strong>, skirt up, as it comes: no supports under the skirt</td>
+              </tr>
+              <tr>
+                <td>BOOT button</td>
+                <td>flange, plug, and the fingers that snap into the lid</td>
+                <td><strong>flange down</strong>, stem up, as it comes</td>
+              </tr>
+            </tbody>
+          </table>
+          <ul>
+            <li><strong>No supports.</strong> Nothing overhangs more than 45&deg;: the skirt, the shelf and the button's fingers are all bridges or chamfers. If your slicer still offers them, turn them off.</li>
+            <li><strong>PLA or PETG</strong>, 0.4 mm nozzle, 0.2 mm layers, 2 walls, 15&ndash;20% infill. The lid's skirt is 0.5 mm: print it a little slower than the rest, and it flexes to snap.</li>
+            <li>The four files already sit the right way on the bed: slice them straight, or arrange them together with no rotation.</li>
+            <li><strong>Check plate first.</strong> It's a minute of printing and it decides everything: the big hole goes over BOOT, the small one over RESET. If they don't, move the numbers in the page (BOOT and RESET, in mm from the USB-C end and the left edge) and make it again.</li>
+          </ul>
+
+          <h2>Putting it together</h2>
+          <ol>
+            <li>The board goes in <strong>buttons up</strong>, its USB-C end at the base's opening, resting on the shelf.</li>
+            <li>With a battery: its leads go first, through the notch in the shelf at the USB-C end, then the cell goes under the board on its <code>BAT</code> pads. <strong>Check the polarity</strong>: some cells come wired the other way round, and the case is closed when you find out.</li>
+            <li>The lid goes on with the USB-C end first, then press the long sides down until both ridges click. Its ribs hold the board onto the shelf.</li>
+            <li>Press the button into the lid's hole until it clicks, and try it: it should press the board's BOOT switch with a firm click. RESET is a paperclip through the small hole.</li>
+          </ol>
+          <p class="note">Tight or loose? The model has the numbers: <code>gap</code> (0.4 mm around the board), <code>snap</code> (0.5 mm of click) and <code>clear</code> (0.3 mm over the switches) in <code>case/lilfm1buddy-case.scad</code>. The page's fields cover the board, the battery and the two switches.</p>
         </section>
       </div>
 

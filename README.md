@@ -125,7 +125,8 @@ another colour, and the lid prints without overhangs). The lid's skirt clicks on
 down on a shelf, with the battery under it if there is one; RESET is a paperclip hole. PLA or PETG, 0.4 mm nozzle, no
 supports: the base open side up, the lid and the button as they come.
 
-The page's **Case** tab makes yours in the browser (OpenSCAD in WebAssembly, and a 3D view): pick the board, a battery
+The page's **Case** tab also says how each piece prints and goes together (the four files are already the right way up on
+the bed; no supports). It makes yours in the browser (OpenSCAD in WebAssembly, and a 3D view): pick the board, a battery
 (or its size), and download the STLs. `case/lilfm1buddy-case.scad` is the model (`openscad` or `tools/cases.sh` for all
 of them), and `tools/cases.sh` writes them to `build/cases/`.
 

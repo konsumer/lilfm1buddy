@@ -25,9 +25,13 @@ section = false;  // preview: cut in half, to see the inside
 /* [The board] */
 board_l = 0;  // 0: the preset's (mm); yours, if it's different
 board_w = 0;
-boot = [3.2, 4.8];  // BOOT's centre: from the USB-C end, from the left wall
-reset = [3.2, 13.0];
-btn_d = 8;  // the BOOT button's cap: the lid's hole is this wide (and it must not reach RESET's switch)
+usb_inset = 4.5;  // how far the board sits back from the USB-C wall: a big BOOT cap over a switch right at its end
+// The XIAO ESP32S3 and Plus, from Seeed's published KiCad (K1 is EN/RESET, K2 is GPIO0/BOOT): both switches 1.65 mm
+// from the USB-C end, and mirrored across the width, 3.05 mm from their long edges. Other boards: measure (the page's
+// check plate is what this is for).
+boot = [1.65, 3.05];  // BOOT's centre: from the USB-C end, from the left wall
+reset = [1.65, 14.73];
+btn_d = 10;  // the BOOT button's cap: the lid's hole is this wide (and it must not reach RESET's switch)
 reset_d = 2.5;  // the paperclip's hole
 
 /* [Battery] */
@@ -54,7 +58,7 @@ eps = 0.01;
 
 // --------------------------------------------------------------------------------------------- boards ---
 // name, length (the USB-C end first), width, the USB-C's width, how far it sticks out past the PCB
-BOARDS = [["xiaoplus", 21, 17.8, 9.0, 0.0], ["xiao", 21, 17.8, 9.0, 0.0], ["zero", 23.5, 18, 9.0, 1.3], ["devkit", 52, 25.4, 9.0, 0.0]];
+BOARDS = [["xiaoplus", 21.15, 17.78, 9.0, 0.0], ["xiao", 21.15, 17.78, 9.0, 0.0], ["zero", 23.5, 18, 9.0, 1.3], ["devkit", 52, 25.4, 9.0, 0.0]];
 B = [for (b = BOARDS) if (b[0] == board) b][0];
 USB_OUT = B[4];
 L = (board_l > 0 ? board_l : B[1]) + USB_OUT;  // (a connector that reaches past the board's edge)
@@ -72,7 +76,7 @@ rib = ABOVE + clear - 0.2;  // the lid's ribs: down to just over the board
 // the board's corner (its USB-C end, its left long edge) is [0, 0]; the cavity around it, after the gap
 b0 = [0, 0];
 b1 = [L, W];
-k0 = b0 - [gap, gap];
+k0 = [b0.x - gap - usb_inset, b0.y - gap];  // (the USB-C end gets the extra room)
 k1 = b1 + [gap, gap];
 
 // ------------------------------------------------------------------------------------------- shapes ---
@@ -81,9 +85,9 @@ module rbox(p0, p1, r = 1.5) {
   translate([p0.x + r, p0.y + r, p0.z]) linear_extrude(s.z) offset(r) square([s.x - 2 * r, s.y - 2 * r]);
 }
 
-// a hole through the x = 0 wall, centered on c: w across (y), h up (z)
+// the USB-C's opening: through the wall, and on to the board (it sits usb_inset back): w across (y), h up (z)
 module wall_hole(c, w, h) {
-  translate([c.x - wall - 1, c.y - w / 2, c.z - h / 2]) cube([wall + 2, w, h]);
+  translate([k0.x - wall - 1, c.y - w / 2, c.z - h / 2]) cube([wall + usb_inset + gap + 2, w, h]);
 }
 
 // a 45 degree ridge (or groove) along x, centered on c, reaching d either side of it
@@ -112,8 +116,8 @@ module base() {
     }
     // the snap grooves, in the outside of both long walls (the lid's skirt clicks into them)
     for (y = [k0.y - wall, k1.y + wall]) ridge([(k0.x + k1.x) / 2, y, groove_z], (k1.x - k0.x) * 0.55, groove_d);
-    // the USB-C, through its end
-    wall_hole([k0.x, W / 2, shelf_h + PCB / 2], USB_W + 0.6, USB_H);
+    // the USB-C, through its end (a tunnel, to the board)
+    wall_hole([0, W / 2, shelf_h + PCB / 2], USB_W + 0.6, USB_H);
     // paperclip holes up through the floor, if asked for
   }
 }
@@ -174,9 +178,10 @@ module button_print() {
 // a check plate: lay it on the board, and see whether the two holes are where its switches are
 module check() {
   difference() {
-    rbox([k0.x - wall, k0.y - wall, 0], [k1.x + wall, k1.y + wall, 1.2], 3);
+    rbox([b0.x, b0.y, 0], [b1.x, b1.y, 1.2], 3);  // (the board's own outline: it lies on the board)
     translate([boot.x, boot.y, -1]) cylinder(d = btn_d, h = 3);
     translate([reset.x, reset.y, -1]) cylinder(d = reset_d, h = 3);
+    translate([b0.x - 1, W / 2 - 3, -1]) cube([3, 6, 3]);  // a notch at the USB-C end: which way round it goes
   }
 }
 

@@ -126,15 +126,22 @@ down on a shelf, with the battery under it if there is one; RESET is a paperclip
 supports: the base open side up, the lid and the button as they come.
 
 The page's **Case** tab also says how each piece prints and goes together (the four files are already the right way up on
-the bed; no supports). It makes yours in the browser (OpenSCAD in WebAssembly, and a 3D view): pick the board, a battery
-(or its size), and download the STLs. `case/lilfm1buddy-case.scad` is the model (`openscad` or `tools/cases.sh` for all
-of them), and `tools/cases.sh` writes them to `build/cases/`.
+the bed; no supports). It makes yours in the browser (OpenSCAD in WebAssembly, and a 3D view): pick the board and a
+battery, and download the STLs — everything else (the outline, where the two switches are, how big the button is) comes
+from the board. `case/lilfm1buddy-case.scad` is the model (`openscad` or `tools/cases.sh` for all of them), and
+`tools/cases.sh` writes them to `build/cases/`.
 
-The BOOT and RESET switches are where the board's maker put them, and the numbers the model starts with are guesses:
-print the **check plate** first (a thin plate with both holes), lay it on the board, and move the holes in the page
-until they sit over the two switches. The model refuses numbers that can't work (a button whose cap would reach RESET's
-switch, a battery bigger than the case, a switch off the board), and it has its own fit test:
+Where the switches are is published data: the XIAOs' is Seeed's own KiCad (`K1` is RESET, `K2` BOOT: both **1.65 mm**
+from the USB-C end, mirrored across the width, **3.05** and **14.73 mm** from the long edges), and the model's defaults
+and the page use it. Waveshare publishes a STEP model of the Zero and Espressif a DXF of the DevKitC-1's outline, not
+their switches: those two presets are guesses. That's what the **check plate** is for — the board's own outline with the
+two holes, a minute to print: lay it on the board, and if the holes are swapped for a board whose switches are mirrored,
+flip `boot`/`reset`'s last pair in the scad. The model refuses numbers that can't work (a button whose cap would reach
+RESET's switch, a battery bigger than the case, a switch off the board), and it has its own fit test:
 `openscad -D 'part="fit"' case/lilfm1buddy-case.scad` must come out empty (it does for each preset).
+
+The board sits **4.5 mm back** from the USB-C wall (`usb_inset`), so a 10 mm BOOT cap over a switch that close to the
+board's end has room; the USB-C gets a 4.9 mm tunnel through the wall.
 
 `tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`
 (mounts its drive, prints where), `eject` (its serial port), `flash ENV` (installs the program, then it's the drive

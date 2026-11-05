@@ -5,13 +5,16 @@
 const OPENSCAD = 'https://cdn.jsdelivr.net/npm/openscad-wasm-prebuilt@1.2.0/dist/openscad.js'
 const SCAD = ['fw/lilfm1buddy-case.scad', 'https://raw.githubusercontent.com/konsumer/lilfm1buddy/main/case/lilfm1buddy-case.scad']
 
-// the supported boards (platformio.ini's envs): their outline, and where their BOOT and RESET switches are, measured
-// from the USB-C end and the left long edge. Those are starting points: the case prints a check plate to measure with
+// the supported boards (platformio.ini's envs): their outline, and where their BOOT and RESET switches are. From the
+// USB-C end, and from the long edge that's on the left when the board's buttons are up and the USB-C is to the left.
+// The XIAOs' are from Seeed's published KiCad (K1 is EN/RESET, K2 is GPIO0/BOOT): both switches 1.65 mm from the
+// USB-C end, mirrored across the width. The other two publish no PCB data (Waveshare a STEP model, Espressif an
+// outline DXF): theirs are guesses, and the check plate is how to get them right.
 const BOARDS = [
-  { id: 'xiaoplus', name: 'XIAO ESP32S3 Plus', l: 21, w: 17.8, boot: [3.2, 4.8], reset: [3.2, 13.0] },
-  { id: 'xiao', name: 'XIAO ESP32S3', l: 21, w: 17.8, boot: [3.2, 4.8], reset: [3.2, 13.0] },
-  { id: 'zero', name: 'Waveshare ESP32-S3-Zero', l: 23.5, w: 18, boot: [4.5, 5.2], reset: [4.5, 12.6] },
-  { id: 'devkit', name: 'ESP32-S3 DevKitC (no headers)', l: 52, w: 25.4, boot: [5, 6], reset: [5, 19] }
+  { id: 'xiaoplus', name: 'XIAO ESP32S3 Plus', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], btn: 10, src: 'Seeed’s KiCad' },
+  { id: 'xiao', name: 'XIAO ESP32S3', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], src: 'Seeed’s KiCad' },
+  { id: 'zero', name: 'Waveshare ESP32-S3-Zero', l: 23.5, w: 18, boot: [4.5, 5.2], reset: [4.5, 12.6], btn: 8, src: 'a guess: measure' },
+  { id: 'devkit', name: 'ESP32-S3 DevKitC (no headers)', l: 52, w: 25.4, boot: [5, 6], reset: [5, 19], btn: 8, src: 'a guess: measure' }
 ]
 const BATTERIES = [
   { name: 'No battery', size: null },
@@ -173,17 +176,11 @@ export function init() {
   const $ = (s) => box.querySelector(s)
   const boardSel = $('[name=board]')
   const batterySel = $('[name=battery]')
-  const size = ['x', 'y', 'z'].map((n) => $(`[name=${n}]`))
-  const boot = ['bx', 'by'].map((n) => $(`[name=${n}]`))
-  const reset = ['rx', 'ry'].map((n) => $(`[name=${n}]`))
-  const btn = $('[name=btn]')
   const status = $('.maker-status')
   const canvas = $('canvas')
-  const still = $('.case-view img')
   const buttons = {}
   for (const b of box.querySelectorAll('.maker-download')) buttons[b.dataset.part] = b
   let view,
-    timer,
     busy,
     again,
     made = {}
@@ -193,37 +190,37 @@ export function init() {
     status.className = `note maker-status${bad ? ' bad' : ''}`
   }
   const board = () => BOARDS.find((b) => b.id === boardSel.value) || BOARDS[0]
+  const battery = () => BATTERIES[+batterySel.value] || BATTERIES[0]
   const nm = (v) => +(+v).toFixed(2)
   const list = (a) => `[${a.map(nm).join(', ')}]`
 
-  // the piece of the file's name for each (the downloads are named after what made them)
+  // the case's own name: the board, and the battery if there is one
   const name = (part) => {
     const b = board()
-    const bat = batterySel.value === 'none' ? '' : `-battery-${size.map((i) => nm(i.value)).join('x')}`
-    return `lilfm1buddy-case-${b.id}${bat}-${part}.stl`
+    const bat = battery().size
+    return `lilfm1buddy-case-${b.id}${bat ? `-battery-${bat.join('x')}` : ''}-${part}.stl`
   }
 
-  // what the model is made with now; or why it can't be
+  // everything the model is made with comes from the board and the battery: the outline, where its switches are, how
+  // big its button is (all in BOARDS), and the room under it
   const defines = (part) => {
     const b = board()
-    const d = { part: `"${part}"`, board: `"${b.id}"`, boot: list(boot.map((i) => i.value)), reset: list(reset.map((i) => i.value)), btn_d: nm(btn.value) }
-    if (batterySel.value !== 'none') {
-      const s = size.map((i) => nm(i.value))
-      if (s.some((v) => !(v > 0))) {
-        return { error: "Fill in the battery's length, width and thickness." }
-      }
-      if (s[0] > b.l + 2 * GAP - 0.4 || s[1] > b.w + 2 * GAP - 0.4) {
-        return { error: `That battery is wider than this board's case: up to ${nm(b.l + 2 * GAP - 0.4)} × ${nm(b.w + 2 * GAP - 0.4)} mm fits under a ${b.name}.` }
-      }
-      d.battery = 'true'
-      d.bat = list(s)
-    } else {
-      d.battery = 'false'
+    const bat = battery().size
+    const d = {
+      part: `"${part}"`,
+      board: `"${b.id}"`,
+      boot: list(b.boot),
+      reset: list(b.reset),
+      btn_d: nm(b.btn),
+      battery: bat ? 'true' : 'false'
     }
-    return { d, b, bat: batterySel.value !== 'none' }
+    if (bat) {
+      d.bat = list(bat)
+    }
+    return d
   }
 
-  // one part of the file, made once for the numbers it's made with
+  // one part of the file, made once for the board and battery it's made for
   const piece = async (part, d, sig) => {
     const key = `${part}|${sig}`
     if (!made[key]) {
@@ -238,34 +235,23 @@ export function init() {
       again = true
       return
     }
-    const p = defines('base')
-    if (p.error) {
-      say(p.error, true)
-      for (const b of Object.values(buttons)) {
-        b.setAttribute('aria-disabled', 'true')
-      }
-      return
-    }
     busy = true
     for (const b of Object.values(buttons)) {
       b.setAttribute('aria-disabled', 'true')
     }
-    say(made[p.b.id] ? 'Making it…' : 'Getting OpenSCAD (about 11 MB, once)…')
+    say(made ? 'Making it…' : 'Getting OpenSCAD (about 11 MB, once)…')
     try {
       view ||= await viewer(canvas)
-      made = {} // (all of it, for these numbers)
-      const sig = [p.b.id, p.bat ? size.map((i) => nm(i.value)).join('x') : '', boot.map((i) => nm(i.value)).join(','), reset.map((i) => nm(i.value)).join(','), nm(btn.value)].join('|')
-      const d = { ...p.d }
+      made = {}
+      const sig = `${board().id}|${battery().size ? battery().size.join('x') : 'none'}`
+      const d = defines('base')
       // the view: the case around a stand-in for the board (and the battery)
       view.set('base', await piece('base', d, sig), BASE)
       view.set('view_board', await piece('view_board', d, sig), BOARD)
-      view.set('view_battery', p.bat ? await piece('view_battery', d, sig) : null, BATTERY)
+      view.set('view_battery', battery().size ? await piece('view_battery', d, sig) : null, BATTERY)
       view.set('view_lid', await piece('view_lid', d, sig), LID)
       view.set('view_button', await piece('view_button', d, sig), LID)
       view.fit()
-      if (still) {
-        still.hidden = true
-      }
       canvas.hidden = false
       // what to print: the plate to check the holes, then the case
       for (const part of ['check', 'base', 'lid', 'button']) {
@@ -275,7 +261,7 @@ export function init() {
         buttons[part].download = name(part)
         buttons[part].removeAttribute('aria-disabled')
       }
-      say(`${p.bat ? 'With a battery: the case is taller, the board sits on a shelf over it.' : 'Without a battery.'} Print the base open side up, the lid and the button as they are, no supports. Drag it to turn it.`)
+      say(battery().size ? `With a ${battery().name.split('·')[0].trim()} battery: the board sits on a shelf over it. Drag it to turn it.` : 'Without a battery. Drag it to turn it.')
     } catch (e) {
       say(`It didn’t work: ${e.message}`, true)
     } finally {
@@ -287,76 +273,32 @@ export function init() {
     }
   }
 
-  // the board, and its switches' starting places
-  const pickBoard = () => {
-    const b = board()
-    boot[0].value = b.boot[0]
-    boot[1].value = b.boot[1]
-    reset[0].value = b.reset[0]
-    reset[1].value = b.reset[1]
-    changed()
-  }
-
-  // the batteries that fit this board: the rest don't work under it
+  // the batteries that fit this board: the rest won't go under it
   const pickBatteries = () => {
     const b = board()
     const was = batterySel.value
     batterySel.innerHTML = BATTERIES.map((bat, i) => {
       const fits = !bat.size || (bat.size[0] <= b.l + 2 * GAP - 0.4 && bat.size[1] <= b.w + 2 * GAP - 0.4)
-      const big = bat.size && !fits
-      return `<option value="${bat.size ? i : 'none'}"${big ? ' disabled' : ''}>${bat.name}${big ? ' (too big for this board)' : ''}</option>`
+      return `<option value="${bat.size ? i : 'none'}"${bat.size && !fits ? ' disabled' : ''}>${bat.name}${bat.size && !fits ? ' (too big for this board)' : ''}</option>`
     }).join('')
     batterySel.value = [...batterySel.options].some((o) => o.value === was && !o.disabled) ? was : 'none'
   }
 
-  const pickBattery = () => {
-    const bat = BATTERIES[+batterySel.value]
-    if (bat && bat.size) {
-      bat.size.forEach((v, k) => (size[k].value = v))
-    }
-    for (const i of size) {
-      i.disabled = !bat
-    }
-    changed()
-  }
-
-  const changed = () => {
-    for (const b of Object.values(buttons)) {
-      b.setAttribute('aria-disabled', 'true')
-    }
-    clearTimeout(timer)
-    timer = setTimeout(make, 350)
-  }
-
   boardSel.innerHTML = BOARDS.map((b) => `<option value="${b.id}">${b.name}</option>`).join('')
   boardSel.value = 'xiaoplus'
-  btn.value = 8 // (the BOOT button's cap)
   pickBatteries()
   boardSel.onchange = () => {
     pickBatteries()
-    pickBoard()
+    make()
   }
-  batterySel.onchange = pickBattery
-  for (const i of [...size, ...boot, ...reset, btn]) {
-    i.oninput = changed
-  }
+  batterySel.onchange = make
 
-  // the plate to print first: lay it on the board and see whether its holes are over the switches
-  if (buttons.check) {
-    buttons.check.addEventListener('click', (e) => {
-      if (buttons.check.getAttribute('aria-disabled')) {
-        e.preventDefault()
-      }
-    })
-  }
-
-  // start with the board's own numbers, once the case is on screen
-  pickBoard()
+  // at the first look at it
   new IntersectionObserver(
     (seen, o) => {
       if (seen.some((s) => s.isIntersecting)) {
         o.disconnect()
-        changed()
+        make()
       }
     },
     { rootMargin: '300px' }

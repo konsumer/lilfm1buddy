@@ -29,7 +29,7 @@
 //   2. its menu (which it is, it says first: an FM-1 or an SMK-37), into its RAM, and a jump to it. Nothing is written to its flash:
 //      switching the FM-1 off and on brings its firmware back
 //   3. the menu asks for what it needs with the commands below, and for what's picked: "install NAME" (the FM-1
-//      back into its boot ROM, JieLi's loader, and the sectors from 0x4000 to the image's end that differ; its head,
+//      back into its boot ROM, its loader, and the sectors from 0x4000 to the image's end that differ; its head,
 //      what the chip starts from, and key_mac stay) or "backup" (its whole flash to fm1-N.bin)
 //
 // Then it sleeps (and when nothing's happening for a while): BOOT or its reset button wakes it.
@@ -70,7 +70,7 @@
 #include "rom.h"
 
 #define MAP FS "/midimap.txt"
-// the menus: one for each device, its screen and keys (only on the drive, as JieLi's loader is)
+// the menus: one for each device, its screen and keys (like the loader, only on the drive)
 #define MENU_FM1 "lilfm1.bin"
 #define MENU_SMK "lilsmk.bin"
 #define FLASH_SIZE 0x100000u

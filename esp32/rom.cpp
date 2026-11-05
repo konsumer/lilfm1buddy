@@ -15,7 +15,7 @@
 // the ROM's
 #define WRITE_MEMORY 0xFB06
 #define JUMP 0xFB08
-// JieLi's loader's
+// the loader's
 #define READ_FLASH 0xFD05
 #define WRITE_FLASH 0xFB04
 #define ERASE_SECTOR 0xFB01

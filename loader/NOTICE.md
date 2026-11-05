@@ -35,4 +35,3 @@ anything here.
 
 The board has the loader in its program, so nothing has to be put on its drive (and no page, no Wi-Fi). A
 `mflr-loader.bin` on the drive is used instead, if there is one: a newer build, to try without flashing the board.
-JieLi's `wl82loader.bin`, if it's on the drive, is the second thing tried, if ours doesn't start.

@@ -13,7 +13,7 @@ const SCAD = ['fw/lilfm1buddy-case.scad', 'https://raw.githubusercontent.com/kon
 const BOARDS = [
   { id: 'xiaoplus', name: 'XIAO ESP32S3 Plus', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], btn: 7, src: 'Seeed’s KiCad' },
   { id: 'xiao', name: 'XIAO ESP32S3', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], src: 'Seeed’s KiCad' },
-  { id: 'zero', name: 'Waveshare ESP32-S3-Zero', l: 23.5, w: 18, boot: [4.5, 5.2], reset: [4.5, 12.6], btn: 8, src: 'a guess: measure' },
+  { id: 'zero', name: 'Waveshare ESP32-S3-Zero', l: 23.5, w: 18, boot: [4.5, 5.2], reset: [4.5, 12.6], btn: 7, src: 'a guess: measure' },
   { id: 'devkit', name: 'ESP32-S3 DevKitC (no headers)', l: 52, w: 25.4, boot: [5, 6], reset: [5, 19], btn: 8, src: 'a guess: measure' }
 ]
 const BATTERIES = [
@@ -192,6 +192,14 @@ export function init() {
   }
   const board = () => BOARDS.find((b) => b.id === boardSel.value) || BOARDS[0]
   const battery = () => BATTERIES[+batterySel.value] || BATTERIES[0]
+
+  // the cap, as big as the board's switches allow: it must not reach RESET's switch (the model checks it too, but a
+  // preset that can't be made shouldn't stop the page)
+  const cap = (b) => {
+    const gap = Math.hypot(b.boot[0] - b.reset[0], b.boot[1] - b.reset[1])
+    const most = 2 * (gap - 2.5) - 2
+    return Math.max(5, Math.floor(Math.min(b.btn, most) * 2) / 2)
+  }
   const nm = (v) => +(+v).toFixed(2)
   const list = (a) => `[${a.map(nm).join(', ')}]`
 
@@ -212,7 +220,7 @@ export function init() {
       board: `"${b.id}"`,
       boot: list(b.boot),
       reset: list(b.reset),
-      ...(b.btn ? { btn_d: nm(b.btn) } : {}),
+      ...(b.btn ? { btn_d: nm(cap(b)) } : {}),
       name: nameBox.checked ? 'true' : 'false',
       battery: bat ? 'true' : 'false'
     }

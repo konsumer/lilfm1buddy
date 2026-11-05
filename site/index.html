@@ -6,6 +6,15 @@
     <title>lilfm1buddy</title>
     <meta name="description" content="Switch the M-VAVE FM-1's firmware from the FM-1 itself, with a tiny ESP32-S3 on its USB port." />
     <link rel="stylesheet" href="style.css" />
+    <!-- the case's 3D view and its OpenSCAD, for the Case tab (casemaker.js) -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
     <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
   </head>
   <body>
@@ -25,6 +34,7 @@
       <a href="#" data-tab="install">Install</a>
       <a href="#drive" data-tab="drive">Drive</a>
       <a href="#use" data-tab="use">Use it</a>
+      <a href="#case" data-tab="case">Case</a>
     </nav>
 
     <main class="wrap">
@@ -114,6 +124,56 @@
             </details>
           </div>
           <p id="nofs" class="bad" hidden>Your browser can't open folders: use Chrome or Edge on a computer, or drag files onto the drive yourself.</p>
+        </section>
+      </div>
+
+      <div data-page="case" hidden>
+        <section class="panel">
+          <h2>The case</h2>
+          <p>Three printed pieces, snap-fit, no screws: the base, the lid, and the BOOT button's own insert (so the button is a separate colour, and prints without supports). The lid clicks onto the walls and its ribs hold the board down on its shelf; RESET is a paperclip hole.</p>
+          <p class="note">The BOOT and RESET switches are where the board's maker put them, and the starting numbers here are measured guesses: print the <strong>check plate</strong> first (about a minute), lay it on the board, and move its holes until they sit over the two switches. Then make the case.</p>
+          <div class="case" id="maker">
+            <div class="case-view">
+              <canvas hidden aria-label="The case in 3D: drag to turn it"></canvas>
+            </div>
+            <div>
+              <p class="row">
+                <label
+                  >Board
+                  <select name="board"></select
+                ></label>
+              </p>
+              <p class="row">
+                <label
+                  >Battery
+                  <select name="battery"></select
+                ></label>
+              </p>
+              <div class="maker-size">
+                <label>Length <input name="x" type="number" min="5" max="70" step="0.5" /></label>
+                <span>&times;</span>
+                <label>Width <input name="y" type="number" min="5" max="50" step="0.5" /></label>
+                <span>&times;</span>
+                <label>Thickness <input name="z" type="number" min="2" max="25" step="0.5" /></label>
+                <span>mm</span>
+              </div>
+              <div class="maker-size">
+                <label>BOOT from USB <input name="bx" type="number" min="1" max="45" step="0.5" /></label>
+                <label>BOOT from edge <input name="by" type="number" min="1" max="30" step="0.5" /></label>
+                <label>RESET from USB <input name="rx" type="number" min="1" max="45" step="0.5" /></label>
+                <label>RESET from edge <input name="ry" type="number" min="1" max="30" step="0.5" /></label>
+                <label>Button <input name="btn" type="number" min="5" max="16" step="0.5" /></label>
+              </div>
+              <div class="actions">
+                <a class="button maker-download" data-part="check" aria-disabled="true">Check plate</a>
+                <a class="button maker-download" data-part="base" aria-disabled="true">Base</a>
+                <a class="button secondary maker-download" data-part="lid" aria-disabled="true">Lid</a>
+                <a class="button secondary maker-download" data-part="button" aria-disabled="true">BOOT button</a>
+              </div>
+              <p class="note maker-status"></p>
+              <p class="note">PLA or PETG, 0.4 mm nozzle, 2 walls: the base open side up, the lid as it is (its skirt up), the button flange down. With a battery it goes under the board, on its <code>BAT</code> pads: check the polarity, and that the leads reach before closing the lid.</p>
+            </div>
+          </div>
         </section>
       </div>
 

@@ -118,6 +118,23 @@ The loader's toolchain is [pi32v2-llvm](https://github.com/jvitkauskas/pi32v2-ll
 Linux, x64 and arm64), not JieLi's: it's native, so no Docker. The board has the loader in its program, so its drive
 doesn't need it; a `mflr-loader.bin` on the drive is used instead, to try a new one without flashing the board.
 
+## The case
+
+Three printed pieces, snap-fit, no screws: the base, the lid, and the BOOT button's own insert (so the button can be
+another colour, and the lid prints without overhangs). The lid's skirt clicks onto the walls; its ribs hold the board
+down on a shelf, with the battery under it if there is one; RESET is a paperclip hole. PLA or PETG, 0.4 mm nozzle, no
+supports: the base open side up, the lid and the button as they come.
+
+The page's **Case** tab makes yours in the browser (OpenSCAD in WebAssembly, and a 3D view): pick the board, a battery
+(or its size), and download the STLs. `case/lilfm1buddy-case.scad` is the model (`openscad` or `tools/cases.sh` for all
+of them), and `tools/cases.sh` writes them to `build/cases/`.
+
+The BOOT and RESET switches are where the board's maker put them, and the numbers the model starts with are guesses:
+print the **check plate** first (a thin plate with both holes), lay it on the board, and move the holes in the page
+until they sit over the two switches. The model refuses numbers that can't work (a button whose cap would reach RESET's
+switch, a battery bigger than the case, a switch off the board), and it has its own fit test:
+`openscad -D 'part="fit"' case/lilfm1buddy-case.scad` must come out empty (it does for each preset).
+
 `tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`
 (mounts its drive, prints where), `eject` (its serial port), `flash ENV` (installs the program, then it's the drive
 again), and any of its commands (`info`, `ls`, `log`, `read OFF LEN NAME`, `rm NAME`). A new menu: build it

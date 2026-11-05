@@ -1,11 +1,9 @@
 // lilfm1buddy's page: tabs, the install button's firmware, and the board's USB drive (BOOT on a computer), opened as a
-// folder (File System Access: Chrome, Edge). Its files: *.fwsc firmwares, *.bin backups, wl82loader.bin, midimap.txt,
-// log.txt (esp32/main.cpp)
+// folder (File System Access: Chrome, Edge). Its files: *.fwsc firmwares, *.bin backups, lilfm1.bin and lilsmk.bin (the
+// menus), midimap.txt, log.txt (esp32/main.cpp)
 
-const LOADER = 'wl82loader.bin'
+const LOADER = 'wl82loader.bin' // (JieLi's: the board doesn't need it any more, and it's kept out of the list)
 const MENUS = { 'lilfm1.bin': 'FM-1', 'lilsmk.bin': 'SMK-37' } // the menus on their screens (picker/): the board needs the one for each device it's used on
-const LOADER_URL = 'https://raw.githubusercontent.com/kagaimiq/jl-uboot-tool/c32b28e7a04f873f526ba929cb1bae9f05442fe9/data/loaderblobs/usb/wl82loader.bin'
-const LOADER_SHA256 = 'd41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68dca5376'
 const CLOUD = 'https://mutant.cloud/' // every FM-1 and SMK-37 firmware: firmware.json, and its packages (dl/) with CORS on
 
 const $ = (s) => document.querySelector(s)
@@ -83,10 +81,16 @@ async function put(name, bytes) {
 }
 
 async function refresh() {
-  const loader = await read(LOADER)
-  const ok = loader && (await sha256(await loader.arrayBuffer())) === LOADER_SHA256
-  $('#loader').innerHTML = ok ? '<span class="good">On the drive.</span>' : '<span class="bad">Not on the drive yet: it can\'t write the FM-1 without it.</span>'
-  $('#getloader').hidden = ok
+  const log = await read('log.txt')
+  const logText = log ? await log.text() : ''
+  const files = []
+  for await (const [name, h] of drive.entries()) {
+    if (h.kind === 'file' && isFirmware(name)) files.push(await h.getFile())
+  }
+  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  // which device the board is used with: what its log last saw ("It's an FM-1 (...)"), or whose backups are here. Only
+  // that one's menu is needed, so only it gets warned about (an FM-1's owner isn't told about lilsmk.bin, or the other way)
+  const kind = /It's an SMK-37/.test(logText) || files.some((f) => /^smk-\d+\.bin$/i.test(f.name)) ? 'SMK-37' : /It's an FM-1/.test(logText) || files.some((f) => /^fm1-\d+\.bin$/i.test(f.name)) ? 'FM-1' : ''
   $('#menus').innerHTML = ''
   for (const [name, device] of Object.entries(MENUS)) {
     const menu = await read(name)
@@ -97,17 +101,16 @@ async function refresh() {
     const p = document.createElement('p')
     p.className = 'row'
     p.innerHTML = `<span></span><button class="button small">${menu ? 'Update it' : 'Put it on'}</button>`
-    p.firstChild.textContent = `${device}: ${menu ? `${name} on the drive${same ? ', the latest.' : '.'}` : `no ${name} on the drive (only needed if you have one).`}`
+    if (menu) p.firstChild.textContent = `${device}: ${name} on the drive${same ? ', the latest.' : '.'}`
+    else if (device === kind) {
+      p.firstChild.innerHTML = '<span class="bad"></span>'
+      p.firstChild.firstChild.textContent = `${device}: no ${name} on the drive, and the board can't show its menu without it.`
+    } else p.firstChild.textContent = `${device}: no ${name} on the drive (only needed if you have one).`
     p.lastChild.hidden = !latest || same
     p.lastChild.addEventListener('click', () => run(`Getting the latest ${device} menu…`, async () => put(name, new Uint8Array(latest))))
     $('#menus').append(p)
   }
   $('#map').textContent = (await read('midimap.txt')) ? 'midimap.txt is on the drive: the board routes MIDI on the FM-1.' : 'No midimap.txt: no MIDI routing.'
-  const files = []
-  for await (const [name, h] of drive.entries()) {
-    if (h.kind === 'file' && isFirmware(name)) files.push(await h.getFile())
-  }
-  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
   const body = $('#files tbody')
   body.innerHTML = ''
   for (const f of files) {
@@ -118,8 +121,7 @@ async function refresh() {
     body.append(tr)
   }
   if (!files.length) body.innerHTML = '<tr><td colspan="3" class="dim">None yet.</td></tr>'
-  const log = await read('log.txt')
-  $('#log').textContent = log ? await log.text() : '(nothing yet)'
+  $('#log').textContent = logText || '(nothing yet)'
 }
 
 // one thing at a time, then the list again
@@ -154,16 +156,6 @@ $('#open').addEventListener('click', async () => {
     }
   }
 })
-
-$('#getloader').addEventListener('click', () =>
-  run("Getting JieLi's loader…", async () => {
-    const r = await fetch(LOADER_URL)
-    if (!r.ok) throw new Error(`Couldn't get it (${r.status}).`)
-    const bytes = new Uint8Array(await r.arrayBuffer())
-    if ((await sha256(bytes)) !== LOADER_SHA256) throw new Error("That isn't the loader it should be.")
-    await put(LOADER, bytes)
-  })
-)
 
 $('#add').addEventListener('change', async (ev) => {
   const files = [...ev.target.files]

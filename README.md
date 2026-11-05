@@ -29,8 +29,8 @@ The board is the FM-1's USB host: one USB-C data cable between them, a USB split
 
 ## Use it
 
-On a computer, the board is a USB drive, `LILBUDDY` (its LED cyan): put firmwares (`.fwsc`) and JieLi's `wl82loader.bin`
-on it (the web page's Drive tab does both). Eject it and it's a serial port (blue) until it's unplugged: for installing
+On a computer, the board is a USB drive, `LILBUDDY` (its LED cyan): put firmwares (`.fwsc`)
+on it (the web page's Drive tab does it). Eject it and it's a serial port (blue) until it's unplugged: for installing
 its program, and its log. Its program installs from its download mode too (hold BOOT, tap reset), which nothing can
 break. Dot files a computer leaves on the drive (macOS's `._` copies, trash, indexes) are cleared away by the board,
 and macOS is told not to make most of them. On the drive:
@@ -38,7 +38,8 @@ and macOS is told not to make most of them. On the drive:
 - `*.fwsc`: firmwares; `*.bin`: backups, `fm1-N.bin` (or `smk-N.bin`, an SMK-37's: the FM-1's chip in a keyboard,
   which it installs and backs up too). Each only goes onto its own kind: never an FM-1's onto an SMK-37, nor the other
   way round, and an SMK-37's own calibration is never written
-- `wl82loader.bin`: JieLi's loader, for writing the FM-1's flash
+- `mflr-loader.bin`: ours, if you want a newer one than the board has in its program: it writes and reads the FM-1's
+  flash, and draws it on the FM-1's screen as it goes (see `loader/`)
 - `lilfm1.bin`, `lilsmk.bin`: the menus on the FM-1's and the SMK-37's screens (`picker/`, run from their RAM), for
   the devices you have: the web page puts the latest there, so the board itself rarely needs updating. The board asks
   the running firmware which it is, and loads its menu
@@ -57,10 +58,13 @@ On the FM-1:
    itself. With any other (SLOOP, ...), or none, the LED blinks yellow: switch the FM-1 off, then on (straight on the
    board for this: no hub).
 3. The FM-1 shows the list, and both batteries at the top: "Back up this FM-1", then its firmwares and backups. Turn
-   SEL to move, press OCT+ to pick, and OCT+ again to be sure (anything else: back). To keep what's on it, switch the
-   FM-1 off and on.
-4. The board writes it (magenta), or backs it up to `fm1-N.bin` (white), and the FM-1 starts: the LED green. Three
-   red blips and a pause: it didn't (`log.txt` says why). Then the board goes to sleep.
+   SEL to move, press OCT+ to pick, and OCT+ again to be sure (anything else: back). OCT- is INFO: what its chip is
+   (its flash and its key, like M-Flasher's page says), the loader, the drive's room, the board's version. The buttons
+   that do something glow dimly. To keep what's on it, switch the FM-1 off and on.
+4. The board writes it (magenta), or backs it up to `fm1-N.bin` (white): the FM-1's screen shows its flash, 16 x 16
+   sectors of 4 KiB, as they're read or written, and the percentage above them. Then the FM-1 starts: the LED green.
+   Three red blips and a pause: it didn't (`log.txt` says why). Then the board restarts, as its host again (the FM-1
+   has restarted too).
 
 Until something is picked, nothing is written. Only the image is written (from `0x4000` to its end: `0x93000` for most
 firmwares, baudgirl `0xBA000`, stock V16 `0xA9000`, a backup `0xFF000`), never the flash's head (what the chip starts
@@ -80,16 +84,16 @@ device (`4C4A:8057`) that takes commands, among them "write this to RAM" and "ju
    its commands, a line of text in each SysEx (`esp32/main.cpp` lists them: `info`, `ls`, `read`, `install`,
    `backup`, `run`, ...). The same commands work on the ESP32's serial port, and from any FM-1 firmware: one could
    switch firmwares from its own menu.
-4. For `install`, the ESP32 sends the FM-1 back into its boot ROM (the menu takes the same SysEx), runs JieLi's
-   `wl82loader.bin` there, and writes the sectors of that firmware's flash image that differ, as fm1buddy's recovery
-   does. A backup is the same, read instead.
+4. For `install`, the ESP32 sends the FM-1 back into its boot ROM (the menu takes the same SysEx), runs its own
+   loader there (m-bootloader's: `loader/`), and writes the sectors of that firmware's flash image that differ, as
+   fm1buddy's recovery does. A backup is the same, read instead. That loader has the FM-1's screen, so it draws the
+   flash's sectors as it goes, and resets the chip into its firmware when it's done.
 
 The menu is [fomajam](https://github.com/konsumer/fomajam)'s update loader (it runs from RAM; from
 [felucca-bsp](https://github.com/hugelton/felucca-bsp)'s) with a menu in front, built on fomajam's platform for each
-device (`third_party/fomajam/platform`: the FM-1's, and the SMK-37's screen, keys and knobs). The loader can't write
-the flash itself here: its flash driver wants the
-flash as the firmware's startup leaves it, and the boot ROM doesn't. If it learns to, the menu could write firmwares
-itself (reading them with `read`), with no change to the ESP32.
+device (`third_party/fomajam/platform`: the FM-1's, and the SMK-37's screen, keys and knobs). The menu can't write the
+flash itself here: its flash driver wants the flash as the firmware's startup leaves it, and the boot ROM doesn't. The
+board's loader can, and has the screen, so the FM-1 shows the map as it goes (`loader/`).
 
 The ESP32 side (`esp32/`) builds on the parts of fm1buddy's code it needs (`third_party/fm1buddy`: the USB host, the
 key, MIDI routing, Bluetooth MIDI, packages), with the boot ROM protocol in `esp32/rom.cpp`. All of its flash past the
@@ -104,10 +108,15 @@ board's program has them in it:
 ```sh
 git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/lilfm1.bin, build/lilsmk.bin
+PI32V2_TOOLCHAIN=~/pi32v2-llvm loader/build.sh       # build/mflr-loader.bin, and esp32/mflr_loader.h (the board's)
 pio run -e xiaoplus -t upload                        # the board
 npm run fmt                                          # the web page's formatting
 npm start                                            # the web page at localhost:8080 (reloads on changes), with what's built
 ```
+
+The loader's toolchain is [pi32v2-llvm](https://github.com/jvitkauskas/pi32v2-llvm) (`pi32v2-23.1.5-2`: macOS and
+Linux, x64 and arm64), not JieLi's: it's native, so no Docker. The board has the loader in its program, so its drive
+doesn't need it; a `mflr-loader.bin` on the drive is used instead, to try a new one without flashing the board.
 
 `tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`
 (mounts its drive, prints where), `eject` (its serial port), `flash ENV` (installs the program, then it's the drive
@@ -136,7 +145,9 @@ it.
   [genkigenki/fm1-to-smk37](https://github.com/genkigenki/fm1-to-smk37)).
 - [FM-1-transporter](https://github.com/kurogedelic/FM-1-transporter) (kurogedelic, MIT) and
   [jl-uboot-tool](https://github.com/kagaimiq/jl-uboot-tool) (kagaimiq, MIT): the boot ROM protocol and the key.
-  JieLi's `wl82loader.bin` isn't included: the page fetches it from jl-uboot-tool.
+  The flash loader is m-bootloader's, and in the board's program.
+- [m-bootloader](https://github.com/jvitkauskas/m-bootloader) (Julius Vitkauskas, MIT): the flash loader `loader/` is
+  built from (its `docs/SPEC.md` is the protocol), with lilfm1buddy's sector map added to its screen.
 - [fm1buddy](https://github.com/konsumer/fm1buddy): the ESP32 side.
 
 The rest is [GPL-3.0](LICENSE), like fm1buddy.

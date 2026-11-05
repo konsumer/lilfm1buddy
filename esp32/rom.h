@@ -11,9 +11,6 @@
 #define ROM_PID 0x8057
 #define PICKER_AT 0x01C0A800u  // the menus', fomajam's platform/loader/loader.ld
 #define PICKER_MAX 0x14000u
-#define LOADER_AT 0x01C02000u  // JieLi's wl82loader.bin
-#define LOADER_SIZE 24064u
-#define LOADER_SHA256 "d41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68dca5376"
 #define SECTOR 0x1000u
 #define WRITE_FROM 0x4000u  // below: the flash's head (what the chip starts from), never written
 #define WRITE_TO 0xFF000u   // above: key_mac
@@ -33,6 +30,25 @@ struct Chip {
   uint32_t io;       // the most a read moves at once
 };
 
+// Our loader: a program that runs in the ROM's place, where the ROM hands it its USB storage commands, and writes and
+// reads the FM-1's flash (loader/: m-bootloader's, with the FM-1's screen)
+struct Loader {
+  uint32_t at;       // where it links, and is run
+  bool plain;        // a plain image (the ROM ciphers it), or as it comes (already ciphered)
+  uint32_t max;      // the most it may be
+};
+extern const Loader MFLR;
+
+// the map's states, one for each of its 256 sectors (screenMap)
+enum MapState : uint8_t {
+  LMAP_NEW,      // not touched
+  LMAP_DIFFERS,  // to write
+  LMAP_WRITTEN,
+  LMAP_SAME,   // already what it should be
+  LMAP_READ,   // read (a backup)
+  LMAP_FAILED,
+};
+
 // a running FM-1 (MIDI device d) into its boot ROM, by SysEx (stock V15, Felucca-based firmwares, the menu); 0 or
 // an error
 const char* enter(int d);
@@ -40,9 +56,13 @@ const char* enter(int d);
 const char* attach(uint32_t ms);
 // image (plain, as the build makes it) into RAM at addr, then jump there; 0 or an error
 const char* run(uint32_t addr, const uint8_t* image, uint32_t n);
-// JieLi's loader (wl82loader.bin as it comes: already ciphered) into RAM and started, and what it says of the chip;
-// 0 or an error
-const char* loader(const uint8_t* image, uint32_t n, Chip& chip);
+// a loader into RAM and started, and what it says of the chip; 0 or an error
+const char* loader(const Loader& l, const uint8_t* image, uint32_t n, Chip& chip);
+// the loader's own screen (Loader::screen, after loader()): the panel (1: the FM-1, 2: the SMK-37), a row of 20
+// cells (row 0..14), and the flash's 256 sectors; false if it didn't take it
+bool screenInit(uint32_t board);
+bool screenRow(uint32_t row, uint16_t fg, uint16_t bg, const char* text);
+bool screenMap(const uint8_t* states);
 // with the loader running: n bytes of its flash from addr; one sector, erased, written and read back; back to its
 // firmware
 const char* read(const Chip& chip, uint32_t addr, uint8_t* out, uint32_t n);

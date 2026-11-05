@@ -6,7 +6,8 @@
 //   *.bin           backups of an FM-1's flash
 //   lilfm1.bin      the menu on the FM-1's screen (picker/: run from its RAM; the web page gets it)
 //   lilsmk.bin      the same for the SMK-37
-//   wl82loader.bin  JieLi's loader, for writing the FM-1's flash (the web page gets it)
+//   mflr-loader.bin the loader (loader/), if there's a newer one than the board has in its program: it writes and reads
+//                   the FM-1's flash, and draws the sector map and the percentage on its screen as it goes
 //   theme.txt       the menus' colors: one of fomajam's themes by name (BLACK, PURPLE, WHITE, ...)
 //   midimap.txt     MIDI routing on the FM-1 (fm1buddy's rules: midimap.h). A line "bluetooth" turns on Bluetooth
 //                   MIDI too, "bluetooth NAME" connects to a Bluetooth MIDI device of that name as well
@@ -25,7 +26,7 @@
 //   2. its menu (which it is, it says first: an FM-1 or an SMK-37), into its RAM, and a jump to it. Nothing is written to its flash:
 //      switching the FM-1 off and on brings its firmware back
 //   3. the menu asks for what it needs with the commands below, and for what's picked: "install NAME" (the FM-1
-//      back into its boot ROM, JieLi's loader, and the sectors from 0x4000 to the image's end that differ; its head,
+//      back into its boot ROM, its loader, and the sectors from 0x4000 to the image's end that differ; its head,
 //      what the chip starts from, and key_mac stay) or "backup" (its whole flash to fm1-N.bin)
 //
 // Then it sleeps (and when nothing's happening for a while): BOOT or its reset button wakes it.
@@ -46,6 +47,7 @@
 //   log                (serial) log.txt
 //   disk               (serial) the USB drive again
 #include <Arduino.h>
+#include <Preferences.h>
 #include <dirent.h>
 #include <driver/rtc_io.h>
 #include <esp_sleep.h>
@@ -59,13 +61,14 @@
 
 #include "board.h"
 #include "fm1.h"
+#include "mflr_loader.h"
 #include "hal.h"
 #include "lil.h"
 #include "midi.h"
 #include "rom.h"
 
 #define MAP FS "/midimap.txt"
-// the menus: one for each device, its screen and keys (only on the drive, as JieLi's loader is)
+// the menus: one for each device, its screen and keys (like the loader, only on the drive)
 #define MENU_FM1 "lilfm1.bin"
 #define MENU_SMK "lilsmk.bin"
 #define FLASH_SIZE 0x100000u
@@ -76,7 +79,7 @@
 #define SMK_MARK 0xC1224u
 #define IDLE_MS 120000  // nothing to do for this long: sleep
 #define MENU_MS 600000  // (with the menu up: nothing picked)
-#define VERSION "0.3.0"
+#define VERSION "0.4.3"
 
 #define SERIAL_MODE 0x53455249
 static RTC_NOINIT_ATTR uint32_t serialFlag;  // a restart into the serial port (the drive ejected)
@@ -92,6 +95,55 @@ static RTC_NOINIT_ATTR uint32_t kindKept;
 static Kind kind;
 
 #define say(...) hal::log("lil: " __VA_ARGS__)
+
+// what the FM-1's (or SMK-37's) chip said of itself, the last time it was read or written (its key, its flash): in its
+// own flash's NVS, not on the drive (that's the user's), and `info` says it, for the menu's INFO screen
+static bool haveChip;
+static rom::Chip lastChip;
+
+static void chipSave(const rom::Chip& chip) {
+  lastChip = chip, haveChip = true;
+  Preferences p;
+  if (p.begin("chip", false)) {
+    p.putUShort("key", chip.key);
+    p.putUInt("flash", chip.flashId);
+    p.putUInt("size", chip.size);
+    p.end();
+  }
+}
+
+static void chipLoad() {
+  Preferences p;
+  if (p.begin("chip", true)) {
+    lastChip.key = p.getUShort("key", 0);
+    lastChip.flashId = p.getUInt("flash", 0);
+    lastChip.size = p.getUInt("size", 0);
+    p.end();
+    haveChip = lastChip.flashId != 0;
+  }
+}
+
+// the sector map of the job in hand: one byte, one of rom::MapState, for each of its 256 sectors of 4 KiB. Only for the
+// screen: nothing else keeps it (the log says how many were written, how many read)
+static uint8_t sectors[256];
+static bool screenOn;  // the loader's screen is up (the map, and the percentage)
+
+static void mapStart() {
+  memset(sectors, rom::LMAP_NEW, sizeof sectors);
+  screenOn = false;
+}
+
+
+// the loader's screen, as the job goes: the percentage on its first row, the sectors under it
+static void mapShow(const char* what, uint32_t done, uint32_t total) {
+  if (!screenOn) {
+    return;
+  }
+  char line[24];
+  snprintf(line, sizeof line, "%s %u%%", what, (unsigned)(total ? done * 100u / total : 100u));
+  rom::screenRow(0, 0xFFFF, 0, line);
+  rom::screenMap(sectors);
+}
 
 // the USB port back to the serial port, for a restart or a wake: they keep it as it is, and a computer on it then
 // wouldn't find the board
@@ -187,17 +239,31 @@ static const char* toRom() {
   return e;
 }
 
-// from a program (device d: the menu, or a firmware that takes the boot ROM's SysEx) to JieLi's loader, on the FM-1's chip: 0, or an error
+// from a program (device d: the menu, or a firmware that takes the boot ROM's SysEx) to our loader, on the FM-1's
+// chip: 0, or an error. What the chip says of itself is kept (in its NVS)
 static const char* toLoader(int d, const std::vector<uint8_t>& loader, rom::Chip& chip) {
   const char* e;
-  if ((e = rom::enter(d)) || (e = rom::attach(10000)) || (e = rom::loader(loader.data(), loader.size(), chip))) {
+  if ((e = rom::enter(d)) || (e = rom::attach(10000))) {
+    return e;
+  }
+  if ((e = rom::loader(rom::MFLR, loader.data(), loader.size(), chip))) {
     return e;
   }
   if (chip.key != FM1_KEY || !fm1Flash(chip.flashId) || chip.size != FLASH_SIZE) {
     rom::leave();
     return "That isn't the FM-1's (or SMK-37's) chip: nothing was done.";
   }
+  chipSave(chip);
   return 0;
+}
+
+// the loader's screen: what the map's colours are, under the percentage
+static void startScreen(const char* key) {
+  if (!rom::screenInit(kind == KIND_SMK ? 2 : 1)) {
+    return;
+  }
+  screenOn = true;
+  rom::screenRow(1, 0x8410, 0, key);
 }
 
 // the whole flash to fm1-N.bin, or smk-N.bin for an SMK-37 (its calibration's mark in it), as fm1buddy names them:
@@ -206,6 +272,7 @@ static const char* backup(int d, const std::vector<uint8_t>& loader) {
   if (disk::freeBytes() < FLASH_SIZE + 65536) {
     return "No room on the drive for a backup.";
   }
+  mapStart();
   const char* part = FS "/backup.part";
   bool smk = false;
   led(LED_READING);
@@ -215,12 +282,24 @@ static const char* backup(int d, const std::vector<uint8_t>& loader) {
   if (!e && !f) {
     e = "Can't write to the drive.";
   }
+  if (!e) {  // (its screen, if ours is the loader: the whole flash, as it's read)
+    startScreen(". NOT READ + READ");
+    mapShow("BACKING UP", 0, 256);
+  }
   static uint8_t buf[SECTOR];
-  for (uint32_t a = 0; !e && f && a < FLASH_SIZE; a += SECTOR) {
-    if (!(e = rom::read(chip, a, buf, SECTOR)) && fwrite(buf, 1, SECTOR, f) != SECTOR) {
-      e = "Can't write to the drive (full?).";
+  for (uint32_t a = 0, k = 0; !e && f && a < FLASH_SIZE; a += SECTOR, k++) {
+    if ((e = rom::read(chip, a, buf, SECTOR))) {
+      sectors[k] = rom::LMAP_FAILED;
+    } else {
+      sectors[k] = rom::LMAP_READ;
+      if (fwrite(buf, 1, SECTOR, f) != SECTOR) {
+        e = "Can't write to the drive (full?).";
+      }
     }
     smk |= a == SMK_MARK / SECTOR * SECTOR && !memcmp(buf + SMK_MARK % SECTOR, "trimdat", 7);
+    if (k % 8 == 7 || a + SECTOR >= FLASH_SIZE) {
+      mapShow("BACKING UP", k + 1, 256);
+    }
   }
   rom::leave();  // (it restarts, into its firmware)
   if (f) {
@@ -279,6 +358,7 @@ static const char* install(int d, const std::string& file, const std::vector<uin
     want = pkg.image + at;
   }
   led(LED_WRITING);
+  mapStart();
   rom::Chip chip;
   if ((e = toLoader(d, loader, chip))) {
     return e;
@@ -294,6 +374,9 @@ static const char* install(int d, const std::string& file, const std::vector<uin
     return smkMark(cal) ? "That's an FM-1's, and this is an SMK-37: nothing was written."
                         : "That's an SMK-37's, and this is an FM-1: nothing was written.";
   }
+  // its screen, if ours is the loader: the sectors it goes through, as it goes
+  startScreen(". SAME  + WRITE");
+  mapShow("INSTALLING", 0, (end - WRITE_FROM + SECTOR - 1) / SECTOR);
   // a sector at a time: read, and written only if it differs
   uint32_t total = (end - WRITE_FROM + SECTOR - 1) / SECTOR, written = 0;
   static uint8_t now[SECTOR], sec[SECTOR];
@@ -303,9 +386,11 @@ static const char* install(int d, const std::string& file, const std::vector<uin
       continue;  // (its calibration: its own, even restoring a backup)
     }
     if ((e = rom::read(chip, a, now, SECTOR))) {
+      sectors[a / SECTOR] = rom::LMAP_FAILED;
       break;
     }
     if (memcmp(want + a, now, n)) {
+      sectors[a / SECTOR] = rom::LMAP_DIFFERS;
       memcpy(sec, now, SECTOR);  // (the end of a short image: as it is)
       memcpy(sec, want + a, n);
       for (int t = 0; t < 3; t++) {
@@ -314,9 +399,13 @@ static const char* install(int d, const std::string& file, const std::vector<uin
         }
         say("sector %06X: %s", (unsigned)a, e);
       }
+      sectors[a / SECTOR] = e ? rom::LMAP_FAILED : rom::LMAP_WRITTEN;
       written++;
+    } else {
+      sectors[a / SECTOR] = rom::LMAP_SAME;
     }
-    if (k % 32 == 0 || k == total) {
+    if (k % 8 == 0 || k == total) {
+      mapShow("INSTALLING", k, total);
       say("  %u of %u sectors, %u written", (unsigned)k, (unsigned)total, (unsigned)written);
     }
   }
@@ -392,11 +481,15 @@ static bool load(const char* name, std::vector<uint8_t>& out, uint32_t max) {
   return !out.empty() && out.size() <= max;
 }
 
-static const char* jieliLoader(std::vector<uint8_t>& out) {
-  char sha[65];
-  return load("wl82loader.bin", out, LOADER_SIZE) && hal::sha256(out.data(), out.size(), sha) && !strcmp(sha, LOADER_SHA256)
-             ? 0
-             : "No wl82loader.bin on its drive (or not JieLi's).";
+// the loader to send: the drive's mflr-loader.bin, if there's one (a newer build, to try without flashing the board),
+// else the one in the board's program (nothing to put on its drive: no page, no Wi-Fi)
+static std::vector<uint8_t> loaderImage() {
+  std::vector<uint8_t> image;
+  if (!load("mflr-loader.bin", image, rom::MFLR.max)) {
+    image.assign(MFLR_LOADER, MFLR_LOADER + MFLR_LOADER_LEN);
+    say("The loader in the board's program.");
+  }
+  return image;
 }
 
 // the boot ROM there (after toRom, or enter): a program from the drive into its RAM, and a jump to it. 0, or an
@@ -501,8 +594,13 @@ static void command(const char* line, int dev) {
       fscanf(f, "%15[A-Za-z0-9]", theme);
       fclose(f);
     }
-    reply("lilfm1buddy " VERSION " free=%llu loader=%d battery=%d%s%s", disk::freeBytes(), !jieliLoader(l),
-          batteryBars(), theme[0] ? " theme=" : "", theme);
+    char chip[40] = "";
+    if (haveChip) {  // the menu's INFO screen: what the FM-1's chip is, as m-flasher's page says it
+      snprintf(chip, sizeof chip, " chip=%04X,%06X,%u", (unsigned)lastChip.key, (unsigned)lastChip.flashId,
+               (unsigned)lastChip.size);
+    }
+    reply("lilfm1buddy " VERSION " free=%llu loader=1 battery=%d%s%s%s", disk::freeBytes(), batteryBars(),
+          theme[0] ? " theme=" : "", theme, chip);
   } else if (!strcmp(cmd, "ls")) {
     if (DIR* d = opendir(FS)) {
       while (dirent* e = readdir(d)) {
@@ -569,22 +667,52 @@ static void command(const char* line, int dev) {
 // the menu on it: 0, or an error
 static const char* startMenu() {
   midi::route(false);
-  const char* e = toRom();
+  // who it is first, before anything's done to it: the menu for that device has to be on the drive, or nothing is sent
+  // (it stays as it is, its screen too, and the LED says what's missing: a menu that isn't there can't draw it)
+  if (!kind) {
+    int d = find(5000);
+    for (uint32_t t = millis(); d >= 0 && !fm1::known(d) && millis() - t < 5000; delay(50)) {
+      fm1::watch();
+    }
+    if (const Fm1Id* id = d >= 0 ? fm1::known(d) : 0) {
+      kind = isSmk(id->model) ? KIND_SMK : KIND_FM1;
+      kindKept = KIND_MAGIC | kind;
+      say("It's %s (%s).", kind == KIND_SMK ? "an SMK-37" : "an FM-1", id->text);
+    }
+  }
   if (!kind) {  // (it didn't say: the menu that's on the drive, the FM-1's if both are or none)
     kind = exists(MENU_SMK) && !exists(MENU_FM1) ? KIND_SMK : KIND_FM1;
   }
-  if (!e && !(e = runProgram(kind == KIND_SMK ? MENU_SMK : MENU_FM1))) {
+  const char* menu = kind == KIND_SMK ? MENU_SMK : MENU_FM1;
+  if (!exists(menu)) {
+    static char e[96];
+    snprintf(e, sizeof e, "No %s on its drive, and %s needs it for its menu.", menu,
+             kind == KIND_SMK ? "an SMK-37" : "an FM-1");
+    return e;  // (nothing's been done to it: its firmware and screen are as they were)
+  }
+  const char* e = toRom();
+  if (!e && !(e = runProgram(menu))) {
     led(LED_PICK);
     say("The menu's on the FM-1.");
   }
   return e;
 }
 
-// what a command left to do: install, backup (then it sleeps), or run
+// done with the FM-1: back as its host (it has restarted into its firmware too), ready for the next one. The log
+// first: a restart, unlike a sleep, saves nothing by itself
+static void restart() {
+  if (fsOk) {
+    logSave();
+  }
+  say("Restarting.");
+  delay(500);  // (its firmware is coming up: let it)
+  esp_restart();
+}
+
+// what a command left to do: install, backup (then it restarts), or run
 static void doAction() {
   Act a = act;
   act = ACT_NONE;
-  std::vector<uint8_t> loader;
   const char* e = 0;
   if (a == ACT_RUN) {
     if ((e = rom::enter(actDev)) || (e = rom::attach(10000)) || (e = runProgram(actFile.c_str()))) {
@@ -594,16 +722,16 @@ static void doAction() {
     return;
   }
   say("%s %s", a == ACT_INSTALL ? "Installing" : "Backing up", actFile.c_str());
-  if (!(e = jieliLoader(loader))) {
-    e = a == ACT_INSTALL ? install(actDev, actFile, loader) : backup(actDev, loader);
-  }
+  std::vector<uint8_t> loader = loaderImage();
+  e = a == ACT_INSTALL ? install(actDev, actFile, loader) : backup(actDev, loader);
   if (e) {
     fail(e);
-  } else {
-    led(LED_DONE);
-    say("Done.");
+    sleepNow();  // (so its log, and the LED, say what happened)
+    return;
   }
-  sleepNow();
+  led(LED_DONE);
+  say("Done.");
+  restart();
 }
 
 // commands from the USB MIDI devices: true if any came
@@ -699,6 +827,7 @@ void setup() {
     return;
   }
   fsOk = disk::mount();
+  chipLoad();  // (what the FM-1's chip is, from the last time: the menu's INFO screen)
   if (hal::recoveryMode() && fsOk) {
     logLoad();
   }

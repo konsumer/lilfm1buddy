@@ -33,6 +33,18 @@ jobs:
             ln -sfn "$(basename "$(ls -d ~/.jieli/jieli-linux-toolchains-* | sort | tail -1)")" ~/.jieli/toolchain
           fi
       - run: JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh
+      - uses: actions/cache@v4
+        with:
+          path: ~/pi32v2
+          key: pi32v2-toolchain-23.1.5-2
+      - name: pi32v2's toolchain (the loader's)
+        run: |
+          if [ ! -e ~/pi32v2/bin/clang ]; then
+            curl -fL --retry 3 -o /tmp/pi32v2.tar.xz https://github.com/jvitkauskas/pi32v2-llvm/releases/download/pi32v2-23.1.5-2/pi32v2-llvm-23.1.5-2-linux-x64.tar.xz
+            mkdir -p ~/pi32v2 && tar -xJf /tmp/pi32v2.tar.xz -C ~/pi32v2 --strip-components=1
+          fi
+      - run: PI32V2_TOOLCHAIN=~/pi32v2 loader/build.sh
+      - run: loader/test.sh
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -47,6 +59,7 @@ jobs:
             site/fw/
             build/lilfm1.bin
             build/lilsmk.bin
+            build/mflr-loader.bin
           if-no-files-found: error
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main'

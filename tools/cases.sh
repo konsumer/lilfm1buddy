@@ -9,7 +9,7 @@ BATTERY="[20,15,4]"  # (the room a 180 mAh cell needs: an XIAO's case is small)
 for board in xiaoplus xiao zero devkit; do
   for kind in plain battery; do
     [ "$kind" = battery ] && b="-D battery=true -D bat=$BATTERY" || b="-D battery=false"
-    for part in base lid button check; do
+    for part in base lid button; do
       out="build/cases/lilfm1buddy-case-$board${kind:+-$kind}-$part.stl"
       openscad -D "part=\"$part\"" -D "board=\"$board\"" $b -o "$out" case/lilfm1buddy-case.scad
     done

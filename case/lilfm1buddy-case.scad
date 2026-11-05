@@ -3,13 +3,11 @@
 // and can be another colour). Printed without supports: the base open side up, the lid top face down, the button
 // flange down.
 //
-//   part    base, lid, button, check (a thin plate with the two holes: lay it on the board, before the case, to see
-//           where they land), preview (the case closed, with a stand-in for the board), view_* (the page's pieces)
+//   part    base, lid, button, preview (the case closed, with a stand-in for the board), view_* (the page's pieces)
 //   board   the preset (xiaoplus, xiao, zero, devkit): its outline, and how far its USB-C sticks out
 //   battery room for a flat LiPo under the board
 //   boot    the BOOT switch's centre: from the USB-C end, and from the left wall (looking at the board's top with its
-//   reset   USB-C to the left). The presets' are guesses: measure yours and put the numbers in. RESET gets a hole for
-//           a paperclip.
+//   reset   USB-C to the left). RESET gets a paperclip hole.
 //
 // openscad -D 'part="lid"' -D 'board="zero"' -o lid.stl case/lilfm1buddy-case.scad   (tools/cases.sh makes them all)
 //
@@ -17,7 +15,7 @@
 // battery pads down.
 
 /* [What] */
-part = "preview"; // [preview, base, lid, button, check, view_lid, view_button, view_board, view_battery]
+part = "preview"; // [preview, base, lid, button, view_lid, view_button, view_board, view_battery]
 board = "xiaoplus"; // [xiaoplus, xiao, zero, devkit]
 battery = false;
 section = false;  // preview: cut in half, to see the inside
@@ -27,8 +25,7 @@ board_l = 0;  // 0: the preset's (mm); yours, if it's different
 board_w = 0;
 usb_inset = 4.5;  // how far the board sits back from the USB-C wall: a big BOOT cap over a switch right at its end
 // The XIAO ESP32S3 and Plus, from Seeed's published KiCad (K1 is EN/RESET, K2 is GPIO0/BOOT): both switches 1.65 mm
-// from the USB-C end, and mirrored across the width, 3.05 mm from their long edges. Other boards: measure (the page's
-// check plate is what this is for).
+// from the USB-C end, and mirrored across the width, 3.05 mm from their long edges.
 boot = [1.65, 3.05];  // BOOT's centre: from the USB-C end, from the left wall
 reset = [1.65, 14.73];
 btn_d = 10;  // the BOOT button's cap: the lid's hole is this wide (and it must not reach RESET's switch)
@@ -175,15 +172,6 @@ module button_print() {
   translate([0, 0, lid_top + FLANGE]) mirror([0, 0, 1]) button_case();
 }
 
-// a check plate: lay it on the board, and see whether the two holes are where its switches are
-module check() {
-  difference() {
-    rbox([b0.x, b0.y, 0], [b1.x, b1.y, 1.2], 3);  // (the board's own outline: it lies on the board)
-    translate([boot.x, boot.y, -1]) cylinder(d = btn_d, h = 3);
-    translate([reset.x, reset.y, -1]) cylinder(d = reset_d, h = 3);
-    translate([b0.x - 1, W / 2 - 3, -1]) cube([3, 6, 3]);  // a notch at the USB-C end: which way round it goes
-  }
-}
 
 // ----------------------------------------------------------------------------------------- preview ---
 module stand_in(shrink = 0) {
@@ -210,7 +198,6 @@ cut() {
   if (part == "base") base();
   if (part == "lid") translate([0, 0, inner_h + lid_t]) mirror([0, 0, 1]) lid();
   if (part == "button") button_print();
-  if (part == "check") check();
   if (part == "preview") {
     color(BASE_COLOR) base();
     stand_in();

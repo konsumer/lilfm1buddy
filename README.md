@@ -134,9 +134,8 @@ from the board. `case/lilfm1buddy-case.scad` is the model (`openscad` or `tools/
 Where the switches are is published data: the XIAOs' is Seeed's own KiCad (`K1` is RESET, `K2` BOOT: both **1.65 mm**
 from the USB-C end, mirrored across the width, **3.05** and **14.73 mm** from the long edges), and the model's defaults
 and the page use it. Waveshare publishes a STEP model of the Zero and Espressif a DXF of the DevKitC-1's outline, not
-their switches: those two presets are guesses. That's what the **check plate** is for — the board's own outline with the
-two holes, a minute to print: lay it on the board, and if the holes are swapped for a board whose switches are mirrored,
-flip `boot`/`reset`'s last pair in the scad. The model refuses numbers that can't work (a button whose cap would reach
+their switches: those two presets are guesses. If a board's case comes out mirrored (its holes swapped), flip `boot`/`reset`'s last pair in the scad. The model refuses
+numbers that can't work (a button whose cap would reach
 RESET's switch, a battery bigger than the case, a switch off the board), and it has its own fit test:
 `openscad -D 'part="fit"' case/lilfm1buddy-case.scad` must come out empty (it does for each preset).
 

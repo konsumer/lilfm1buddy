@@ -9,7 +9,7 @@ const SCAD = ['fw/lilfm1buddy-case.scad', 'https://raw.githubusercontent.com/kon
 // USB-C end, and from the long edge that's on the left when the board's buttons are up and the USB-C is to the left.
 // The XIAOs' are from Seeed's published KiCad (K1 is EN/RESET, K2 is GPIO0/BOOT): both switches 1.65 mm from the
 // USB-C end, mirrored across the width. The other two publish no PCB data (Waveshare a STEP model, Espressif an
-// outline DXF): theirs are guesses, and the check plate is how to get them right.
+// outline DXF): theirs are estimates.
 const BOARDS = [
   { id: 'xiaoplus', name: 'XIAO ESP32S3 Plus', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], btn: 10, src: 'Seeed’s KiCad' },
   { id: 'xiao', name: 'XIAO ESP32S3', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], src: 'Seeed’s KiCad' },
@@ -254,7 +254,7 @@ export function init() {
       view.fit()
       canvas.hidden = false
       // what to print: the plate to check the holes, then the case
-      for (const part of ['check', 'base', 'lid', 'button']) {
+      for (const part of ['base', 'lid', 'button']) {
         const stl = await piece(part, d, sig)
         const url = URL.createObjectURL(new Blob([stl], { type: 'model/stl' }))
         buttons[part].href = url

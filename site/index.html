@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>lilfm1buddy</title>
     <meta name="description" content="Switch the M-VAVE FM-1's firmware from the FM-1 itself, with a tiny ESP32-S3 on its USB port." />
-    <link rel="stylesheet" href="style.css?v=5" />
+    <link rel="stylesheet" href="style.css?v=6" />
     <!-- the case's 3D view and its OpenSCAD, for the Case tab (casemaker.js) -->
     <script type="importmap">
       {
@@ -131,7 +131,7 @@
         <section class="panel">
           <h2>The case</h2>
           <p>Three printed pieces, snap-fit, no screws: the base, the lid, and the BOOT button's own insert (so the button is a separate colour, and prints without supports). The lid clicks onto the walls and its ribs hold the board down on its shelf; RESET is a paperclip hole.</p>
-          <p class="note">Pick the board and whether there's a battery: the case's size, where its holes go and how big the button is all follow from those. Print the <strong>check plate</strong> first (about a minute, the board's own outline with the two holes), lay it on the board, and see that the holes sit over BOOT and RESET.</p>
+          <p class="note">Pick the board and whether there's a battery: the case's size, where its holes go and how big the button is all follow from those.</p>
           <div class="case" id="maker">
             <div class="case-view">
               <canvas hidden aria-label="The case in 3D: drag to turn it"></canvas>
@@ -150,7 +150,6 @@
                 ></label>
               </p>
               <div class="actions">
-                <a class="button maker-download" data-part="check" aria-disabled="true">Check plate</a>
                 <a class="button maker-download" data-part="base" aria-disabled="true">Base</a>
                 <a class="button secondary maker-download" data-part="lid" aria-disabled="true">Lid</a>
                 <a class="button secondary maker-download" data-part="button" aria-disabled="true">BOOT button</a>
@@ -169,11 +168,6 @@
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>Check plate</td>
-                <td>the lid's outline, 1.2 mm, with just the two holes</td>
-                <td>flat, either side up &mdash; <strong>print this first</strong>, lay it on the board and use it to place the holes</td>
-              </tr>
               <tr>
                 <td>Base</td>
                 <td>floor, walls, the shelf for the board, the USB-C opening</td>
@@ -194,8 +188,7 @@
           <ul>
             <li><strong>No supports.</strong> Nothing overhangs more than 45&deg;: the skirt, the shelf and the button's fingers are all bridges or chamfers. If your slicer still offers them, turn them off.</li>
             <li><strong>PLA or PETG</strong>, 0.4 mm nozzle, 0.2 mm layers, 2 walls, 15&ndash;20% infill. The lid's skirt is 0.5 mm: print it a little slower than the rest, and it flexes to snap.</li>
-            <li>The four files already sit the right way on the bed: slice them straight, or arrange them together with no rotation.</li>
-            <li><strong>Check plate first.</strong> It's a minute of printing and it decides everything: the big hole goes over BOOT, the small one over RESET. If they don't, move the numbers in the page (BOOT and RESET, in mm from the USB-C end and the left edge) and make it again.</li>
+            <li>The three files already sit the right way on the bed: slice them straight, or arrange them together with no rotation.</li>
           </ul>
 
           <h2>Putting it together</h2>
@@ -269,6 +262,6 @@
         </section>
       </div>
     </main>
-    <script type="module" src="app.js?v=5"></script>
+    <script type="module" src="app.js?v=6"></script>
   </body>
 </html>

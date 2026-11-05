@@ -730,7 +730,18 @@ static const char* startMenu() {
   return e;
 }
 
-// what a command left to do: install, backup (then it sleeps), or run
+// done with the FM-1: back as its host (it has restarted into its firmware too), ready for the next one. The log
+// first: a restart, unlike a sleep, saves nothing by itself
+static void restart() {
+  if (fsOk) {
+    logSave();
+  }
+  say("Restarting.");
+  delay(500);  // (its firmware is coming up: let it)
+  esp_restart();
+}
+
+// what a command left to do: install, backup (then it restarts), or run
 static void doAction() {
   Act a = act;
   act = ACT_NONE;
@@ -747,11 +758,12 @@ static void doAction() {
   e = a == ACT_INSTALL ? install(actDev, actFile, ls) : backup(actDev, ls);
   if (e) {
     fail(e);
-  } else {
-    led(LED_DONE);
-    say("Done.");
+    sleepNow();  // (so its log, and the LED, say what happened)
+    return;
   }
-  sleepNow();
+  led(LED_DONE);
+  say("Done.");
+  restart();
 }
 
 // commands from the USB MIDI devices: true if any came

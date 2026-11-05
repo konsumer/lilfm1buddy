@@ -158,10 +158,14 @@ const char* rom::run(uint32_t addr, const uint8_t* image, uint32_t n) {
   return "Its boot ROM is still there: the jump didn't happen.";
 }
 
-const rom::Loader rom::JIELI = {"wl82loader.bin", LOADER_AT, false, false, LOADER_SIZE};
-const rom::Loader rom::MFLR = {"mflr-loader.bin", 0x01C20000u, true, true, 0x8000u};
+const rom::Loader rom::JIELI = {"wl82loader.bin", LOADER_AT, false, false, false, LOADER_SIZE};
+const rom::Loader rom::MFLR = {"mflr-loader.bin", 0x01C20000u, true, true, true, 0x8000u};
+
+// the loader that's running (what leave() can do with it)
+static const rom::Loader* active;
 
 const char* rom::loader(const Loader& l, const uint8_t* image, uint32_t n, Chip& chip) {
+  active = 0;
   if (!n || n > l.max) {
     return "That loader is a size it can't be.";
   }
@@ -192,6 +196,7 @@ const char* rom::loader(const Loader& l, const uint8_t* image, uint32_t n, Chip&
     }
   }
   hal::log("rom: %s running", l.name);
+  active = &l;
   if (!exec(GET_ONLINE_DEVICE, 0, 0, resp)) {
     leave();
     return "The loader didn't say what flash it has.";
@@ -324,7 +329,17 @@ void rom::leave() {
     return;
   }
   uint8_t args[4], resp[16];
+  if (active && active->restarts) {
+    // ours: the chip's own reset, as switching it off and on is (a reset makes the ROM start its firmware). Its answer
+    // may be lost: the chip is restarting
+    be32(args, 0);
+    exec(0xFC48, args, 0, resp, 1, 500);
+    hal::log("rom: reset: back to its firmware");
+    active = 0;
+    return;
+  }
   be32(args, 1);
   exec(RUN_APP, args, 4, resp, 2, 500);  // (it may restart before it answers)
   hal::log("rom: back to its firmware");
+  active = 0;
 }

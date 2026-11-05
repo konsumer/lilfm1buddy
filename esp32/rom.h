@@ -40,6 +40,7 @@ struct Loader {
   uint32_t at;       // where it links, and is run
   bool plain;        // a plain image (the ROM ciphers it), or as it comes (already ciphered)
   bool screen;       // it can draw on the FM-1's (or SMK-37's) screen itself: the map, and what's going on
+  bool restarts;     // it can reset the chip into its firmware itself (a software reset): ours can, JieLi's can't
   uint32_t max;      // the most it may be
 };
 extern const Loader JIELI;   // JieLi's: what its firmware's flashers use

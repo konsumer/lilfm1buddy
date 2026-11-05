@@ -66,7 +66,8 @@ On the FM-1:
    that do something glow dimly. To keep what's on it, switch the FM-1 off and on.
 4. The board writes it (magenta), or backs it up to `fm1-N.bin` (white): the FM-1's screen shows its flash, 16 x 16
    sectors of 4 KiB, as they're read or written, and the percentage above them. Then the FM-1 starts: the LED green.
-   Three red blips and a pause: it didn't (`log.txt` says why). Then the board goes to sleep.
+   Three red blips and a pause: it didn't (`log.txt` says why). Then the board restarts, as its host again (the FM-1
+   has restarted too).
 
 Until something is picked, nothing is written. Only the image is written (from `0x4000` to its end: `0x93000` for most
 firmwares, baudgirl `0xBA000`, stock V16 `0xA9000`, a backup `0xFF000`), never the flash's head (what the chip starts

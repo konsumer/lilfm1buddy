@@ -17,6 +17,8 @@ struct loader_services {
     void (*screen_progress)(unsigned, uint16_t);
     /* lilfm1buddy's: the flash's 256 sectors, what has happened to each (FC47) */
     void (*screen_map)(const uint8_t *, unsigned);
+    /* lilfm1buddy's: the chip's own reset, back to its firmware (FC48) */
+    void (*reset)(void);
     uint32_t entry;
     uint8_t cpu_mhz;
 };
@@ -24,7 +26,7 @@ struct loader_state {
     struct loader_services io;
     uint32_t crc_table[256];
     uint8_t buffer[2][4096];
-    uint8_t error, screen;
+    uint8_t error, screen, reset_pending;
 };
 void loader_init(struct loader_state *, const struct loader_services *);
 int loader_dispatch(struct loader_state *, const uint8_t command[31], uint8_t answer[16]);

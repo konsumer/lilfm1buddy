@@ -101,6 +101,7 @@ static bool known(unsigned op) {
     case 0xfc45:
     case 0xfc46:
     case 0xfc47: /* lilfm1buddy's sector map */
+    case 0xfc48: /* lilfm1buddy's: reset, back to its firmware */
         return true;
     default:
         return false;
@@ -281,7 +282,14 @@ int loader_dispatch(struct loader_state *s, const uint8_t cbw[31], uint8_t ans[1
         ans[2] = s->error;
         s->error = 0;
         break;
+    case 0xfc48:
+        /* lilfm1buddy's: the chip's own reset (power-control bit 4), so it starts its firmware again, as switching it
+         * off and on does. Its answer goes first: the host may not see it */
+        s->reset_pending = 1;
+        break;
     }
     send_bytes(s, ans, count < 16 ? count:16);
+    if (s->reset_pending && s->io.reset)
+        s->io.reset();
     return 1;
 }

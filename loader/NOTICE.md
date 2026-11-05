@@ -9,10 +9,18 @@ It's [m-bootloader](https://github.com/jvitkauskas/m-bootloader)'s flash loader 
 `loader_target`, `display`, `platform`, `core` and `runtime`, and `tools/target.ld.S` its link script. `LICENSE` is its
 (MIT). Its specification, `docs/SPEC.md` there, is the protocol.
 
-What lilfm1buddy adds: `LMAP` — the flash as 16 × 16 sectors of 4 KiB, a byte a sector, drawn as it's read or written
-(`FC47`: `display_map` in `src/display.c`, `src/loader.c`), so the FM-1 shows what's going on instead of a still
-screen. Colours, one a state: dark, not touched; amber, to write; green, written; dim green, already the same; cyan,
-read; red, failed. The board draws the two rows above it (`FC44`), with the percentage.
+What lilfm1buddy adds:
+
+- `FC47`: the flash as 16 × 16 sectors of 4 KiB, a byte a sector, drawn as it's read or written (`display_map` in
+  `src/display.c`), so the FM-1 shows what's going on instead of a still screen. Colours, one a state: dark, not
+  touched; amber, to write; green, written; dim green, already the same; cyan, read; red, failed. The board draws the
+  two rows above it (`FC44`), with the percentage.
+- `FC48`: the chip's own reset (power-control bit 4), so it starts its firmware again when the job's done, as switching
+  it off and on does. The loader has no JieLi `RUN_APP`: without this, it stayed in the boot ROM at the end. Its
+  answer goes out first; the host may not see it.
+
+`test.sh` builds `loader.c` and `core.c` for this computer and checks those commands, the screen's rows, and what the
+board asks of it (`test.c`): `CC=clang loader/test.sh`.
 
 Build it (the toolchain is [pi32v2-llvm](https://github.com/jvitkauskas/pi32v2-llvm), `pi32v2-23.1.5-2`, not JieLi's):
 

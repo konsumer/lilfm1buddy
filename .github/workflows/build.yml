@@ -44,6 +44,7 @@ jobs:
             mkdir -p ~/pi32v2 && tar -xJf /tmp/pi32v2.tar.xz -C ~/pi32v2 --strip-components=1
           fi
       - run: PI32V2_TOOLCHAIN=~/pi32v2 loader/build.sh
+      - run: loader/test.sh
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

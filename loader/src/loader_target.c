@@ -31,7 +31,7 @@ int loader_entry(const uint32_t *params) {
         },
         .send = send, .receive = receive, .read_start = flash_dma_start, .read_finish = flash_dma_finish,
         .jedec = flash_jedec, .key = key, .uid = flash_uid, .screen_init = display_init,
-        .screen_row = display_row, .screen_progress = display_progress, .screen_map = display_map,
+        .screen_row = display_row, .screen_progress = display_progress, .screen_map = display_map, .reset = hal_reset,
         .entry = LOADER_ADDRESS, .cpu_mhz = (uint8_t)mhz
     };
     loader_init(&loader, &io);

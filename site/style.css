@@ -201,6 +201,19 @@ td {
   white-space: nowrap;
 }
 
+/* the case's tables are prose, not numbers: their last cell wraps like the rest */
+table.words td:last-child {
+  width: auto;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+table.words td {
+  vertical-align: top;
+  padding-bottom: 8px;
+}
+
 td:last-child {
   width: 1%;
   text-align: right;

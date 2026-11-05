@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>lilfm1buddy</title>
     <meta name="description" content="Switch the M-VAVE FM-1's firmware from the FM-1 itself, with a tiny ESP32-S3 on its USB port." />
-    <link rel="stylesheet" href="style.css?v=3" />
+    <link rel="stylesheet" href="style.css?v=4" />
     <!-- the case's 3D view and its OpenSCAD, for the Case tab (casemaker.js) -->
     <script type="importmap">
       {
@@ -160,7 +160,7 @@
           </div>
 
           <h2 id="measure">Where the numbers come from</h2>
-          <table>
+          <table class="words">
             <thead>
               <tr>
                 <th>Board</th>
@@ -189,7 +189,7 @@
           <p class="note">The two XIAO switches are mirrored across the board's width. If the check plate's holes come out swapped (its big hole over RESET), the case is mirrored too: say so and we'll flip the numbers (or change <code>boot</code>/<code>reset</code> in <code>case/lilfm1buddy-case.scad</code>).</p>
 
           <h2>Printing it</h2>
-          <table>
+          <table class="words">
             <thead>
               <tr>
                 <th>File</th>
@@ -298,6 +298,6 @@
         </section>
       </div>
     </main>
-    <script type="module" src="app.js?v=3"></script>
+    <script type="module" src="app.js?v=4"></script>
   </body>
 </html>

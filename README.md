@@ -38,7 +38,6 @@ and macOS is told not to make most of them. On the drive:
 - `*.fwsc`: firmwares; `*.bin`: backups, `fm1-N.bin` (or `smk-N.bin`, an SMK-37's: the FM-1's chip in a keyboard,
   which it installs and backs up too). Each only goes onto its own kind: never an FM-1's onto an SMK-37, nor the other
   way round, and an SMK-37's own calibration is never written
-- `wl82loader.bin`: JieLi's loader, for writing the FM-1's flash (the board has its own now, so it isn't needed)
 - `mflr-loader.bin`: ours, if you want a newer one than the board has in its program: it writes and reads the FM-1's
   flash, and draws it on the FM-1's screen as it goes (see `loader/`)
 - `chip.txt`: what the FM-1's chip said of itself the last time (its key, its flash's id and size): the menu shows it
@@ -89,9 +88,8 @@ device (`4C4A:8057`) that takes commands, among them "write this to RAM" and "ju
    switch firmwares from its own menu.
 4. For `install`, the ESP32 sends the FM-1 back into its boot ROM (the menu takes the same SysEx), runs its own
    loader there (m-bootloader's: `loader/`), and writes the sectors of that firmware's flash image that differ, as
-   fm1buddy's recovery does. A backup is the same, read instead. That loader has the FM-1's screen and keys, so it
-   draws the flash's sectors as it goes, and the chip's key and flash as it finds them; the menu's frozen last frame
-   is all JieLi's `wl82loader.bin` could leave.
+   fm1buddy's recovery does. A backup is the same, read instead. That loader has the FM-1's screen, so it draws the
+   flash's sectors as it goes, and resets the chip into its firmware when it's done.
 
 The menu is [fomajam](https://github.com/konsumer/fomajam)'s update loader (it runs from RAM; from
 [felucca-bsp](https://github.com/hugelton/felucca-bsp)'s) with a menu in front, built on fomajam's platform for each
@@ -149,7 +147,7 @@ it.
   [genkigenki/fm1-to-smk37](https://github.com/genkigenki/fm1-to-smk37)).
 - [FM-1-transporter](https://github.com/kurogedelic/FM-1-transporter) (kurogedelic, MIT) and
   [jl-uboot-tool](https://github.com/kagaimiq/jl-uboot-tool) (kagaimiq, MIT): the boot ROM protocol and the key.
-  JieLi's `wl82loader.bin` isn't included: the page fetches it from jl-uboot-tool.
+  The flash loader is m-bootloader's, and in the board's program.
 - [m-bootloader](https://github.com/jvitkauskas/m-bootloader) (Julius Vitkauskas, MIT): the flash loader `loader/` is
   built from (its `docs/SPEC.md` is the protocol), with lilfm1buddy's sector map added to its screen.
 - [fm1buddy](https://github.com/konsumer/fm1buddy): the ESP32 side.

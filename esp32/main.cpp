@@ -6,9 +6,8 @@
 //   *.bin           backups of an FM-1's flash
 //   lilfm1.bin      the menu on the FM-1's screen (picker/: run from its RAM; the web page gets it)
 //   lilsmk.bin      the same for the SMK-37
-//   wl82loader.bin  JieLi's loader, for writing the FM-1's flash (the web page gets it)
-//   mflr-loader.bin ours, if it's there (loader/): the same flash it gives JieLi's loader, and the FM-1's screen, so
-//                   the FM-1 shows the sector map and the percentage as it writes or reads (see install/backup)
+//   mflr-loader.bin the loader (loader/), if there's a newer one than the board has in its program: it writes and reads
+//                   the FM-1's flash, and draws the sector map and the percentage on its screen as it goes
 //   chip.txt        what the FM-1's chip said of itself the last time (key=, flash=, size=): the menu shows it
 //   map.txt         the sector map of the last install or backup, one character a sector (. not touched, s the same,
 //                   w written, r read, ! failed), under a line saying which it was
@@ -82,7 +81,7 @@
 #define SMK_MARK 0xC1224u
 #define IDLE_MS 120000  // nothing to do for this long: sleep
 #define MENU_MS 600000  // (with the menu up: nothing picked)
-#define VERSION "0.4.1"
+#define VERSION "0.4.2"
 
 #define SERIAL_MODE 0x53455249
 static RTC_NOINIT_ATTR uint32_t serialFlag;  // a restart into the serial port (the drive ejected)
@@ -263,32 +262,15 @@ static const char* toRom() {
   return e;
 }
 
-// a loader for the FM-1's flash, and the image that goes to it
-struct LoaderChoice {
-  const rom::Loader* l;
-  std::vector<uint8_t> image;
-};
-
-// the loader that's running now (what its screen can do)
-static const rom::Loader* running;
-
-// from a program (device d: the menu, or a firmware that takes the boot ROM's SysEx) to a loader, on the FM-1's chip:
-// 0, or an error. What the chip says of itself is kept (chip.txt). The loaders are tried in order, until one starts
-static const char* toLoader(int d, const std::vector<LoaderChoice>& ls, rom::Chip& chip) {
+// from a program (device d: the menu, or a firmware that takes the boot ROM's SysEx) to our loader, on the FM-1's
+// chip: 0, or an error. What the chip says of itself is kept (chip.txt)
+static const char* toLoader(int d, const std::vector<uint8_t>& loader, rom::Chip& chip) {
   const char* e;
-  running = 0;
   if ((e = rom::enter(d)) || (e = rom::attach(10000))) {
     return e;
   }
-  for (const LoaderChoice& c : ls) {
-    if (!(e = rom::loader(*c.l, c.image.data(), c.image.size(), chip))) {
-      running = c.l;
-      break;
-    }
-    say("%s: %s", c.l->name, e);
-  }
-  if (!running) {
-    return e ? e : "No loader to try.";
+  if ((e = rom::loader(rom::MFLR, loader.data(), loader.size(), chip))) {
+    return e;
   }
   if (chip.key != FM1_KEY || !fm1Flash(chip.flashId) || chip.size != FLASH_SIZE) {
     rom::leave();
@@ -298,9 +280,9 @@ static const char* toLoader(int d, const std::vector<LoaderChoice>& ls, rom::Chi
   return 0;
 }
 
-// the loader's own screen, if that's the one running: what the map's colours are, under the percentage
+// the loader's screen: what the map's colours are, under the percentage
 static void startScreen(const char* key) {
-  if (!running || !running->screen || !rom::screenInit(kind == KIND_SMK ? 2 : 1)) {
+  if (!rom::screenInit(kind == KIND_SMK ? 2 : 1)) {
     return;
   }
   screenOn = true;
@@ -309,7 +291,7 @@ static void startScreen(const char* key) {
 
 // the whole flash to fm1-N.bin, or smk-N.bin for an SMK-37 (its calibration's mark in it), as fm1buddy names them:
 // 0, or an error
-static const char* backup(int d, const std::vector<LoaderChoice>& ls) {
+static const char* backup(int d, const std::vector<uint8_t>& loader) {
   if (disk::freeBytes() < FLASH_SIZE + 65536) {
     return "No room on the drive for a backup.";
   }
@@ -318,7 +300,7 @@ static const char* backup(int d, const std::vector<LoaderChoice>& ls) {
   bool smk = false;
   led(LED_READING);
   rom::Chip chip;
-  const char* e = toLoader(d, ls, chip);
+  const char* e = toLoader(d, loader, chip);
   FILE* f = e ? 0 : fopen(part, "wb");
   if (!e && !f) {
     e = "Can't write to the drive.";
@@ -364,7 +346,7 @@ static bool smkMark(const uint8_t* calSector) {
   return !memcmp(calSector + SMK_MARK - SMK_CAL, "trimdat", 7);
 }
 
-static const char* install(int d, const std::string& file, const std::vector<LoaderChoice>& ls) {
+static const char* install(int d, const std::string& file, const std::vector<uint8_t>& loader) {
   static Pkg pkg;
   std::vector<uint8_t> raw;
   std::string path = FS "/" + file;
@@ -402,7 +384,7 @@ static const char* install(int d, const std::string& file, const std::vector<Loa
   led(LED_WRITING);
   mapStart((std::string("install ") + file).c_str());
   rom::Chip chip;
-  if ((e = toLoader(d, ls, chip))) {
+  if ((e = toLoader(d, loader, chip))) {
     return e;
   }
   // which it is (its calibration, or none), before anything's written: its own firmwares and backups only
@@ -524,24 +506,15 @@ static bool load(const char* name, std::vector<uint8_t>& out, uint32_t max) {
   return !out.empty() && out.size() <= max;
 }
 
-// what to try, in order: ours (the drive's mflr-loader.bin, if it's there, so a new build can be tried without
-// flashing the board; else the one built into the board's program: no drive, no page, nothing to get), then JieLi's,
-// if it's on the drive
-static std::vector<LoaderChoice> loaderChoices() {
-  std::vector<LoaderChoice> out;
-  LoaderChoice mine{&rom::MFLR, {}};
-  if (!load(rom::MFLR.name, mine.image, rom::MFLR.max)) {
-    mine.image.assign(MFLR_LOADER, MFLR_LOADER + MFLR_LOADER_LEN);
+// the loader to send: the drive's mflr-loader.bin, if there's one (a newer build, to try without flashing the board),
+// else the one in the board's program (nothing to put on its drive: no page, no Wi-Fi)
+static std::vector<uint8_t> loaderImage() {
+  std::vector<uint8_t> image;
+  if (!load("mflr-loader.bin", image, rom::MFLR.max)) {
+    image.assign(MFLR_LOADER, MFLR_LOADER + MFLR_LOADER_LEN);
     say("The loader in the board's program.");
   }
-  out.push_back(std::move(mine));
-  LoaderChoice jieli{&rom::JIELI, {}};
-  char sha[65];
-  if (load(rom::JIELI.name, jieli.image, LOADER_SIZE) && hal::sha256(jieli.image.data(), jieli.image.size(), sha) &&
-      !strcmp(sha, LOADER_SHA256)) {
-    out.push_back(std::move(jieli));
-  }
-  return out;
+  return image;
 }
 
 // the boot ROM there (after toRom, or enter): a program from the drive into its RAM, and a jump to it. 0, or an
@@ -719,11 +692,31 @@ static void command(const char* line, int dev) {
 // the menu on it: 0, or an error
 static const char* startMenu() {
   midi::route(false);
-  const char* e = toRom();
+  // who it is first, before anything's done to it: the menu for that device has to be on the drive, or nothing is sent
+  // (it stays as it is, its screen too, and the LED says what's missing: a menu that isn't there can't draw it)
+  if (!kind) {
+    int d = find(5000);
+    for (uint32_t t = millis(); d >= 0 && !fm1::known(d) && millis() - t < 5000; delay(50)) {
+      fm1::watch();
+    }
+    if (const Fm1Id* id = d >= 0 ? fm1::known(d) : 0) {
+      kind = isSmk(id->model) ? KIND_SMK : KIND_FM1;
+      kindKept = KIND_MAGIC | kind;
+      say("It's %s (%s).", kind == KIND_SMK ? "an SMK-37" : "an FM-1", id->text);
+    }
+  }
   if (!kind) {  // (it didn't say: the menu that's on the drive, the FM-1's if both are or none)
     kind = exists(MENU_SMK) && !exists(MENU_FM1) ? KIND_SMK : KIND_FM1;
   }
-  if (!e && !(e = runProgram(kind == KIND_SMK ? MENU_SMK : MENU_FM1))) {
+  const char* menu = kind == KIND_SMK ? MENU_SMK : MENU_FM1;
+  if (!exists(menu)) {
+    static char e[96];
+    snprintf(e, sizeof e, "No %s on its drive, and %s needs it for its menu.", menu,
+             kind == KIND_SMK ? "an SMK-37" : "an FM-1");
+    return e;  // (nothing's been done to it: its firmware and screen are as they were)
+  }
+  const char* e = toRom();
+  if (!e && !(e = runProgram(menu))) {
     led(LED_PICK);
     say("The menu's on the FM-1.");
   }
@@ -754,8 +747,8 @@ static void doAction() {
     return;
   }
   say("%s %s", a == ACT_INSTALL ? "Installing" : "Backing up", actFile.c_str());
-  std::vector<LoaderChoice> ls = loaderChoices();
-  e = a == ACT_INSTALL ? install(actDev, actFile, ls) : backup(actDev, ls);
+  std::vector<uint8_t> loader = loaderImage();
+  e = a == ACT_INSTALL ? install(actDev, actFile, loader) : backup(actDev, loader);
   if (e) {
     fail(e);
     sleepNow();  // (so its log, and the LED, say what happened)

@@ -62,9 +62,9 @@
             <span slot="not-allowed">This page has to be opened over https.</span>
           </esp-web-install-button>
           <p id="nofw" class="bad" hidden>No build yet: the page has no firmware next to it.</p>
-          <h2>2. JieLi's loader, and firmwares</h2>
+          <h2>2. Firmwares</h2>
           <p>On a computer the board is a USB drive, <code>LILBUDDY</code> (its LED cyan). Put <code>.fwsc</code> firmwares on it (drag them there, or from the Drive tab). Eject it when you're done.</p>
-          <p>The board carries its own loader for the FM-1's flash, and draws the flash's sectors on the FM-1's screen as it writes or reads. JieLi's (<code>wl82loader.bin</code>, from <a href="https://github.com/kagaimiq/jl-uboot-tool">jl-uboot-tool</a>) isn't needed; on the drive, it's the second thing the board tries, if its own doesn't start.</p>
+          <p>The board carries its own loader for the FM-1's flash, and draws the flash's sectors on the FM-1's screen as it writes or reads: there's nothing to put on its drive for that.</p>
           <p><a href="#drive" class="button" data-tab="drive">Go to Drive</a></p>
         </section>
       </div>
@@ -77,13 +77,8 @@
             <span id="drive" class="dim"></span>
           </p>
           <div id="manage" hidden>
-            <h2>JieLi's loader</h2>
-            <p class="row">
-              <span id="loader"></span>
-              <button id="getloader" class="button small" hidden>Get it</button>
-            </p>
             <h2>The menus on the FM-1 and SMK-37</h2>
-            <p class="dim">Updating lilfm1buddy is just these and JieLi's loader: the program on the board stays the same.</p>
+            <p class="dim">Updating lilfm1buddy is just these files: the program on the board stays the same. Each device needs its own menu on the drive before the board can show it.</p>
             <div id="menus"></div>
             <h2>Firmwares and backups</h2>
             <p class="dim">The FM-1's menu shows the first 23, by name, after "Back up this FM-1".</p>

@@ -11,9 +11,6 @@
 #define ROM_PID 0x8057
 #define PICKER_AT 0x01C0A800u  // the menus', fomajam's platform/loader/loader.ld
 #define PICKER_MAX 0x14000u
-#define LOADER_AT 0x01C02000u  // JieLi's wl82loader.bin
-#define LOADER_SIZE 24064u
-#define LOADER_SHA256 "d41da6126760c9d66660bcc0cac8d27d221806c5e369a8036921efe68dca5376"
 #define SECTOR 0x1000u
 #define WRITE_FROM 0x4000u  // below: the flash's head (what the chip starts from), never written
 #define WRITE_TO 0xFF000u   // above: key_mac
@@ -33,18 +30,14 @@ struct Chip {
   uint32_t io;       // the most a read moves at once
 };
 
-// A program that runs in the ROM's place, where the ROM hands its USB storage commands to it: the FM-1's flash, and
-// its boot ROM's jobs. JieLi's (wl82loader.bin), or ours (mflr-loader.bin: m-bootloader's, with the FM-1's screen)
+// Our loader: a program that runs in the ROM's place, where the ROM hands it its USB storage commands, and writes and
+// reads the FM-1's flash (loader/: m-bootloader's, with the FM-1's screen)
 struct Loader {
-  const char* name;  // its file on the drive
   uint32_t at;       // where it links, and is run
   bool plain;        // a plain image (the ROM ciphers it), or as it comes (already ciphered)
-  bool screen;       // it can draw on the FM-1's (or SMK-37's) screen itself: the map, and what's going on
-  bool restarts;     // it can reset the chip into its firmware itself (a software reset): ours can, JieLi's can't
   uint32_t max;      // the most it may be
 };
-extern const Loader JIELI;   // JieLi's: what its firmware's flashers use
-extern const Loader MFLR;    // ours: the same commands, and the screen (loader/)
+extern const Loader MFLR;
 
 // the map's states, one for each of its 256 sectors (screenMap)
 enum MapState : uint8_t {

@@ -5,7 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>lilfm1buddy</title>
     <meta name="description" content="Switch the M-VAVE FM-1's firmware from the FM-1 itself, with a tiny ESP32-S3 on its USB port." />
-    <link rel="stylesheet" href="style.css?v=14" />
+    <link rel="stylesheet" href="style.css?v=15" />
+    <!-- the case's 3D view and its OpenSCAD, for the Case tab (casemaker.js) -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
     <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
   </head>
   <body>
@@ -25,6 +34,7 @@
       <a href="#" data-tab="install">Install</a>
       <a href="#drive" data-tab="drive">Drive</a>
       <a href="#use" data-tab="use">Use it</a>
+      <a href="#case" data-tab="case">Case</a>
     </nav>
 
     <main class="wrap">
@@ -117,6 +127,58 @@
         </section>
       </div>
 
+      <div data-page="case" hidden>
+        <section class="panel">
+          <h2>The case</h2>
+          <p>Four printed pieces that snap together, no screws: the shell (the top and the walls), the base that clicks into it, and the two buttons. <strong>BOOT</strong> is the big one and stands out a little; <strong>RESET</strong> is flush with the top, so you won't press it by accident (no paperclip needed). The board's LED shows through the top: on the XIAOs, through the buttons themselves.</p>
+          <p class="note">Pick the board (and on the XIAOs, a battery). The case's size, its holes and its buttons all follow from the board, measured from its maker's own CAD.</p>
+          <div class="case" id="maker">
+            <div class="case-view">
+              <canvas hidden aria-label="The case in 3D: drag to turn it"></canvas>
+            </div>
+            <div>
+              <p class="row">
+                <label
+                  >Board
+                  <select name="board"></select
+                ></label>
+              </p>
+              <p class="row">
+                <label
+                  >Battery
+                  <select name="battery"></select
+                ></label>
+              </p>
+              <div class="maker-custom row" hidden>
+                <label>Width <input name="bat_x" type="number" min="1" step="0.5" /></label>
+                <label>Length <input name="bat_y" type="number" min="1" step="0.5" /></label>
+                <label>Thickness <input name="bat_z" type="number" min="1" step="0.5" /></label>
+                <p class="note">In mm, the cell itself (the case adds room for its leads). Up to <span class="maker-room"></span> wide; a longer one makes the case longer.</p>
+              </div>
+              <label class="maker-switch maker-antenna"><input type="checkbox" name="antenna" checked /> A channel for the antenna's cable (the XIAO has no antenna on the board)</label>
+              <div class="actions">
+                <a class="button maker-download" data-part="shell" aria-disabled="true">Shell</a>
+                <a class="button secondary maker-download" data-part="base" aria-disabled="true">Base</a>
+                <a class="button secondary maker-download" data-part="buttons" aria-disabled="true">Buttons</a>
+              </div>
+              <p class="note maker-status"></p>
+            </div>
+          </div>
+
+          <h2>Printing it</h2>
+          <p>Print the files as they come, no supports: the shell top face down, the base flat, the buttons cap down. PLA or PETG, 0.4 mm nozzle, 0.2 mm layers. On a XIAO, print the buttons in a light colour: the LEDs shine through them.</p>
+
+          <h2>Putting it together</h2>
+          <ol>
+            <li>Lay the shell top face down. Drop the buttons into their holes from inside, caps first: the big one is BOOT. A button with a flat side only goes in one way round: turn it until it drops.</li>
+            <li>The board goes in <strong>face down</strong> (its parts toward the top), USB-C end first: tilt it, put the USB-C into its window, then lay the far end down onto the rails. The buttons now rest on its switches.</li>
+            <li>On a XIAO: plug the antenna into its socket and run the cable down the channel at the far end; the antenna itself sticks to the base's floor (or to the battery).</li>
+            <li>With a battery: solder it to the <code>BAT</code> pads on the XIAO's back (<strong>check the polarity</strong> with a meter: the wire colours on these aren't always right), and stick it to the base's floor, between its lips, with double-sided tape.</li>
+            <li>Press the base in until both long sides click. Its lips push the board up against the rails, so nothing rattles. To open it, lift the base at the notch in the far end with a fingernail.</li>
+          </ol>
+        </section>
+      </div>
+
       <div data-page="use" hidden>
         <section class="panel">
           <ol>
@@ -177,6 +239,6 @@
         </section>
       </div>
     </main>
-    <script type="module" src="app.js?v=14"></script>
+    <script type="module" src="app.js?v=15"></script>
   </body>
 </html>

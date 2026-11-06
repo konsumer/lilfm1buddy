@@ -201,6 +201,145 @@ td {
   white-space: nowrap;
 }
 
+td:last-child {
+  width: 1%;
+  text-align: right;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs a {
+  padding: 8px 14px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--dim);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tabs a.on {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+details {
+  margin: 20px 0 0;
+}
+
+summary {
+  cursor: pointer;
+  color: var(--dim);
+}
+
+.icon {
+  display: inline-flex;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.icon:hover {
+  background: var(--code);
+  color: var(--bad);
+}
+
+.icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+select {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+}
+
+h2 a {
+  color: inherit;
+}
+
+/* the case: the view above the controls (one column: at this page's width a second column wouldn't fit, and a sticky
+   view would sit on top of it) */
+.case {
+  margin: 16px 0;
+}
+
+.case-view {
+  max-width: min(420px, 100%);
+  margin: 0 auto 16px;
+}
+
+.case-view canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  touch-action: none;
+  cursor: grab;
+}
+
+.case-view canvas[hidden] {
+  display: none;
+}
+
+.case .actions .button {
+  margin: 0 6px 6px 0;
+}
+
+.maker-switch {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.maker-switch input {
+  width: 1.1em;
+  height: 1.1em;
+  accent-color: var(--accent);
+}
+
 .case select {
   max-width: 100%;
+}
+
+/* a battery's own size, when it isn't one of the list's */
+.maker-custom {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.maker-custom input {
+  width: 6em;
+  margin-left: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+}
+
+.maker-custom .note {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.maker-custom[hidden],
+.maker-switch[hidden] {
+  display: none;
 }

@@ -6,15 +6,6 @@
     <title>lilfm1buddy</title>
     <meta name="description" content="Switch the M-VAVE FM-1's firmware from the FM-1 itself, with a tiny ESP32-S3 on its USB port." />
     <link rel="stylesheet" href="style.css?v=14" />
-    <!-- the case's 3D view and its OpenSCAD, for the Case tab (casemaker.js) -->
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-        }
-      }
-    </script>
     <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
   </head>
   <body>
@@ -34,7 +25,6 @@
       <a href="#" data-tab="install">Install</a>
       <a href="#drive" data-tab="drive">Drive</a>
       <a href="#use" data-tab="use">Use it</a>
-      <a href="#case" data-tab="case">Case</a>
     </nav>
 
     <main class="wrap">
@@ -124,49 +114,6 @@
             </details>
           </div>
           <p id="nofs" class="bad" hidden>Your browser can't open folders: use Chrome or Edge on a computer, or drag files onto the drive yourself.</p>
-        </section>
-      </div>
-
-      <div data-page="case" hidden>
-        <section class="panel">
-          <h2>The case</h2>
-          <p>Three printed pieces, snap-fit, no screws: the base, the lid, and the BOOT button's own insert (so the button is a separate colour, and prints without supports). The lid clicks onto the walls and its ribs hold the board down on its shelf; RESET is a paperclip hole.</p>
-          <p class="note">Pick the board and whether there's a battery: the case's size, where its holes go and how big the button is all follow from those.</p>
-          <div class="case" id="maker">
-            <div class="case-view">
-              <canvas hidden aria-label="The case in 3D: drag to turn it"></canvas>
-            </div>
-            <div>
-              <p class="row">
-                <label
-                  >Board
-                  <select name="board"></select
-                ></label>
-              </p>
-              <p class="row">
-                <label
-                  >Battery
-                  <select name="battery"></select
-                ></label>
-              </p>
-              <label class="maker-switch"><input type="checkbox" name="name" checked /> &ldquo;lilbuddy&rdquo; cut into the lid</label>
-              <div class="actions">
-                <a class="button maker-download" data-part="base" aria-disabled="true">Base</a>
-                <a class="button secondary maker-download" data-part="lid" aria-disabled="true">Lid</a>
-                <a class="button secondary maker-download" data-part="button" aria-disabled="true">BOOT button</a>
-              </div>
-              <p class="note maker-status"></p>
-            </div>
-          </div>
-
-          <h2>Printing it, and putting it together</h2>
-          <p>Print the three pieces as they come, no supports: the base open side up, the lid skirt up, the button flange down. PLA or PETG, 0.4 mm nozzle, 0.2 mm layers, 2 walls, 15&ndash;20% infill.</p>
-          <ol>
-            <li>The board goes in <strong>buttons up</strong>, its USB-C end at the base's opening, resting on the shelf.</li>
-            <li>With a battery: its leads go first, through the notch in the shelf at the USB-C end, then the cell goes under the board on its <code>BAT</code> pads. <strong>Check the polarity</strong>: some cells come wired the other way round.</li>
-            <li>The lid goes on with the USB-C end first, then press the long sides down until both ridges click. Its ribs hold the board onto the shelf.</li>
-            <li>Press the BOOT button into the lid's hole (it's a press fit: flat with the lid, and it stays). It should press the board's switch with a firm click; RESET is a paperclip through the small hole.</li>
-          </ol>
         </section>
       </div>
 

@@ -118,6 +118,25 @@ The loader's toolchain is [pi32v2-llvm](https://github.com/jvitkauskas/pi32v2-ll
 Linux, x64 and arm64), not JieLi's: it's native, so no Docker. The board has the loader in its program, so its drive
 doesn't need it; a `mflr-loader.bin` on the drive is used instead, to try a new one without flashing the board.
 
+## The case
+
+Four printed pieces that snap together, no screws, no supports: the shell (the top and the walls, printed top face
+down), the base (it clicks into the shell's open bottom), and the two buttons. BOOT is the big one and stands out a
+little; RESET is flush, so it isn't pressed by accident and needs no paperclip. Each button goes into its hole from
+inside, and a flange under the top keeps it there. The LED shows through the top (on the XIAOs, through the buttons,
+which sit over their LEDs). The base's lips push the board up onto rails under the top with a springy strip, and its
+ridges pull it up against the walls: nothing rattles. On the XIAOs there's room for a battery under the board, and a
+channel for the antenna's cable.
+
+The page's **Case** tab makes yours in the browser (OpenSCAD in WebAssembly, with a 3D view): pick the board and a
+battery, and download the three STLs. It also says how to print it and put it together. `case/lilfm1buddy-case.scad`
+is the model; `tools/cases.sh` writes every board's STLs to `build/cases/`, and `tools/cases.sh --check` runs its fit
+checks (the case against a stand-in for the board, the buttons at rest and pressed, the base, the USB-C plug, the
+battery), which must all pass.
+
+The numbers are each board's maker's own CAD, not guesses: Waveshare's STEP model of the ESP32-S3-Zero, Seeed's STEP
+model and KiCad of the XIAO ESP32S3, and Seeed's KiCad of the Plus (the .scad's table says what came from where).
+
 `tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`
 (mounts its drive, prints where), `eject` (its serial port), `flash ENV` (installs the program, then it's the drive
 again), and any of its commands (`info`, `ls`, `log`, `read OFF LEN NAME`, `rm NAME`). A new menu: build it

@@ -1,4 +1,6 @@
-// lilfm1buddy's page: tabs, the install button's firmware, and the board's USB drive (BOOT on a computer), opened as a
+import { init as initMaker } from './casemaker.js?v=15'
+
+// lilfm1buddy's page: tabs, the install button's firmware, the case, and the board's USB drive (BOOT on a computer), opened as a
 // folder (File System Access: Chrome, Edge). Its files: *.fwsc firmwares, *.bin backups, lilfm1.bin and lilsmk.bin (the
 // menus), midimap.txt, log.txt (esp32/main.cpp)
 
@@ -18,6 +20,7 @@ for (const a of document.querySelectorAll('[data-tab]')) {
   a.addEventListener('click', () => tab(a.dataset.tab))
 }
 tab(location.hash.slice(1) || 'install')
+initMaker() // (the case: OpenSCAD in the browser, and its 3D view, when it's on screen)
 
 // ---- the program next to the page, for the board picked (remembered). None until one is: another board's program
 // doesn't start (another flash size, PSRAM), so nothing is installed until it's said which ----

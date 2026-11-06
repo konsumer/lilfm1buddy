@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")/.."
 mkdir -p build/cases
 BATTERY="[20,15,4]"  # (the room a 180 mAh cell needs: an XIAO's case is small)
-for board in xiaoplus xiao zero devkit; do
+for board in xiaoplus xiao zero; do
   for kind in plain battery; do
     [ "$kind" = battery ] && b="-D battery=true -D bat=$BATTERY" || b="-D battery=false"
     for part in base lid button; do

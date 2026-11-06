@@ -131,16 +131,18 @@ battery, and download the STLs — everything else (the outline, where the two s
 from the board. `case/lilfm1buddy-case.scad` is the model (`openscad` or `tools/cases.sh` for all of them), and
 `tools/cases.sh` writes them to `build/cases/`.
 
-Where the switches are is published data: the XIAOs' is Seeed's own KiCad (`K1` is RESET, `K2` BOOT: both **1.65 mm**
-from the USB-C end, mirrored across the width, **3.05** and **14.73 mm** from the long edges), and the model's defaults
-and the page use it. Waveshare publishes a STEP model of the Zero and Espressif a DXF of the DevKitC-1's outline, not
-their switches: those two presets are guesses. If a board's case comes out mirrored (its holes swapped), flip `boot`/`reset`'s last pair in the scad. The model refuses
-numbers that can't work (a button whose cap would reach
-RESET's switch, a battery bigger than the case, a switch off the board), and it has its own fit test:
-`openscad -D 'part="fit"' case/lilfm1buddy-case.scad` must come out empty (it does for each preset).
+The numbers are measured, not guessed: the XIAOs' outline and switches are Seeed's own KiCad (K1 is RESET, K2 BOOT:
+both 1.65 mm from the USB-C end, mirrored across the width, 3.05 and 14.73 mm from the long edges), and the
+Waveshare's are from its published STEP model (PCB 18.02 x 23.52 x 1.6; its USB-C 8.94 wide, 1.22 past the edge and
+3.25 above the top face, since it is on the component side; its two switches 8.67 mm from the USB-C end, 13.24 and
+4.89 mm across, 1.6 high). The board sits 4.0 mm back from the USB-C wall (usb_inset), which is what gives the BOOT
+button's lip room under the lid's plate; the USB-C gets a slot through both the wall and the lid's skirt, from below
+the board's top face to 0.5 mm over the connector.
 
-The board sits **4.5 mm back** from the USB-C wall (`usb_inset`), so the BOOT button over a switch that close to the
-board's end has room; the USB-C gets a 4.9 mm tunnel through the wall. Its cap is 7 mm and pressed into the lid — the
+The model is checked, not trusted: `part="fit"` (the case against a stand-in for the board), `part="fit_button"` (the
+button's neck, lip and stem against the lid) and `part="fit_usb"` (the USB-C plug's way in) each have to come out
+empty, and do for every board, with and without a battery. It also refuses a battery the case can't hold and a cap that
+would reach RESET's switch. Its cap is 7 mm and pressed into the lid — the
 switches sit about 3 mm from their boards' long edges, where a snap's ring would have to hang under the wall.
 
 `tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`

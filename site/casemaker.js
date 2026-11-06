@@ -5,16 +5,12 @@
 const OPENSCAD = 'https://cdn.jsdelivr.net/npm/openscad-wasm-prebuilt@1.2.0/dist/openscad.js'
 const SCAD = ['fw/lilfm1buddy-case.scad', 'https://raw.githubusercontent.com/konsumer/lilfm1buddy/main/case/lilfm1buddy-case.scad']
 
-// the supported boards (platformio.ini's envs): their outline, and where their BOOT and RESET switches are. From the
-// USB-C end, and from the long edge that's on the left when the board's buttons are up and the USB-C is to the left.
-// The XIAOs' are from Seeed's published KiCad (K1 is EN/RESET, K2 is GPIO0/BOOT): both switches 1.65 mm from the
-// USB-C end, mirrored across the width. The other two publish no PCB data (Waveshare a STEP model, Espressif an
-// outline DXF): theirs are estimates.
+// the boards the case is made for. Their outline, their switches' places and the cap are in the .scad's own table
+// (measured from Seeed's and Waveshare's CAD); here they're only for the battery list, which needs the outline
 const BOARDS = [
-  { id: 'xiaoplus', name: 'XIAO ESP32S3 Plus', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], btn: 7, src: 'Seeed’s KiCad' },
-  { id: 'xiao', name: 'XIAO ESP32S3', l: 21.15, w: 17.78, boot: [1.65, 3.05], reset: [1.65, 14.73], src: 'Seeed’s KiCad' },
-  { id: 'zero', name: 'Waveshare ESP32-S3-Zero', l: 23.5, w: 18, boot: [4.5, 5.2], reset: [4.5, 12.6], btn: 7, src: 'a guess: measure' },
-  { id: 'devkit', name: 'ESP32-S3 DevKitC (no headers)', l: 52, w: 25.4, boot: [5, 6], reset: [5, 19], btn: 8, src: 'a guess: measure' }
+  { id: 'xiaoplus', name: 'XIAO ESP32S3 Plus', l: 21.15, w: 17.78 },
+  { id: 'xiao', name: 'XIAO ESP32S3', l: 21.15, w: 17.78 },
+  { id: 'zero', name: 'Waveshare ESP32-S3-Zero', l: 23.52, w: 18.02 }
 ]
 const BATTERIES = [
   { name: 'No battery', size: null },
@@ -217,10 +213,7 @@ export function init() {
     const bat = battery().size
     const d = {
       part: `"${part}"`,
-      board: `"${b.id}"`,
-      boot: list(b.boot),
-      reset: list(b.reset),
-      ...(b.btn ? { btn_d: nm(cap(b)) } : {}),
+      board: `"${b.id}"`, // (everything else about the board is the .scad's: one place for the measured numbers)
       name: nameBox.checked ? 'true' : 'false',
       battery: bat ? 'true' : 'false'
     }

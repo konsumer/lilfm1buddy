@@ -39,7 +39,7 @@ and macOS is told not to make most of them. On the drive:
   which it installs and backs up too). Each only goes onto its own kind: never an FM-1's onto an SMK-37, nor the other
   way round, and an SMK-37's own calibration is never written
 - `mflr-loader.bin`: ours, if you want a newer one than the board has in its program: it writes and reads the FM-1's
-  flash, and draws it on the FM-1's screen as it goes (see `loader/`)
+  flash, and draws it on the FM-1's screen as it goes (see fm1buddy's `loader/`, `third_party/fm1buddy/loader`)
 - `lilfm1.bin`, `lilsmk.bin`: the menus on the FM-1's and the SMK-37's screens (`picker/`, run from their RAM), for
   the devices you have: the web page puts the latest there, so the board itself rarely needs updating. The board asks
   the running firmware which it is, and loads its menu
@@ -85,7 +85,7 @@ device (`4C4A:8057`) that takes commands, among them "write this to RAM" and "ju
    `backup`, `run`, ...). The same commands work on the ESP32's serial port, and from any FM-1 firmware: one could
    switch firmwares from its own menu.
 4. For `install`, the ESP32 sends the FM-1 back into its boot ROM (the menu takes the same SysEx), runs its own
-   loader there (m-bootloader's: `loader/`), and writes the sectors of that firmware's flash image that differ, as
+   loader there (m-bootloader's: `third_party/fm1buddy/loader`), and writes the sectors of that firmware's flash image that differ, as
    fm1buddy's recovery does. A backup is the same, read instead. That loader has the FM-1's screen, so it draws the
    flash's sectors as it goes, and resets the chip into its firmware when it's done.
 
@@ -93,7 +93,7 @@ The menu is [fomajam](https://github.com/konsumer/fomajam)'s update loader (it r
 [felucca-bsp](https://github.com/hugelton/felucca-bsp)'s) with a menu in front, built on fomajam's platform for each
 device (`third_party/fomajam/platform`: the FM-1's, and the SMK-37's screen, keys and knobs). The menu can't write the
 flash itself here: its flash driver wants the flash as the firmware's startup leaves it, and the boot ROM doesn't. The
-board's loader can, and has the screen, so the FM-1 shows the map as it goes (`loader/`).
+board's loader can, and has the screen, so the FM-1 shows the map as it goes (`third_party/fm1buddy/loader`).
 
 The ESP32 side (`esp32/`) builds on the parts of fm1buddy's code it needs (`third_party/fm1buddy`: the USB host, the
 key, MIDI routing, Bluetooth MIDI, packages), with the boot ROM protocol in `esp32/rom.cpp`. All of its flash past the
@@ -108,7 +108,7 @@ board's program has them in it:
 ```sh
 git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/lilfm1.bin, build/lilsmk.bin
-PI32V2_TOOLCHAIN=~/pi32v2-llvm loader/build.sh       # build/mflr-loader.bin, and esp32/mflr_loader.h (the board's)
+PI32V2_TOOLCHAIN=~/pi32v2-llvm third_party/fm1buddy/loader/build.sh  # its build/mflr-loader.bin, and src/app/mflr_loader.h (the board's)
 pio run -e xiaoplus -t upload                        # the board
 npm run fmt                                          # the web page's formatting
 npm start                                            # the web page at localhost:8080 (reloads on changes), with what's built
@@ -166,7 +166,7 @@ it.
 - [FM-1-transporter](https://github.com/kurogedelic/FM-1-transporter) (kurogedelic, MIT) and
   [jl-uboot-tool](https://github.com/kagaimiq/jl-uboot-tool) (kagaimiq, MIT): the boot ROM protocol and the key.
   The flash loader is m-bootloader's, and in the board's program.
-- [m-bootloader](https://github.com/jvitkauskas/m-bootloader) (Julius Vitkauskas, MIT): the flash loader `loader/` is
+- [m-bootloader](https://github.com/jvitkauskas/m-bootloader) (Julius Vitkauskas, MIT): the flash loader (fm1buddy's `loader/`, `third_party/fm1buddy/loader`) is
   built from (its `docs/SPEC.md` is the protocol), with lilfm1buddy's sector map added to its screen.
 - [fm1buddy](https://github.com/konsumer/fm1buddy): the ESP32 side.
 

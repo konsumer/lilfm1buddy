@@ -6,7 +6,7 @@
 //   *.bin           backups of an FM-1's flash
 //   lilfm1.bin      the menu on the FM-1's screen (picker/: run from its RAM; the web page gets it)
 //   lilsmk.bin      the same for the SMK-37
-//   mflr-loader.bin the loader (loader/), if there's a newer one than the board has in its program: it writes and reads
+//   mflr-loader.bin the loader (third_party/fm1buddy/loader), if there's a newer one than the board has in its program: it writes and reads
 //                   the FM-1's flash, and draws the sector map and the percentage on its screen as it goes
 //   theme.txt       the menus' colors: one of fomajam's themes by name (BLACK, PURPLE, WHITE, ...)
 //   midimap.txt     MIDI routing on the FM-1 (fm1buddy's rules: midimap.h). A line "bluetooth" turns on Bluetooth

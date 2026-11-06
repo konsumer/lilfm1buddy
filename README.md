@@ -118,33 +118,6 @@ The loader's toolchain is [pi32v2-llvm](https://github.com/jvitkauskas/pi32v2-ll
 Linux, x64 and arm64), not JieLi's: it's native, so no Docker. The board has the loader in its program, so its drive
 doesn't need it; a `mflr-loader.bin` on the drive is used instead, to try a new one without flashing the board.
 
-## The case
-
-Three printed pieces, snap-fit, no screws: the base, the lid, and the BOOT button's own insert (so the button can be
-another colour, and the lid prints without overhangs). The lid's skirt clicks onto the walls; its ribs hold the board
-down on a shelf, with the battery under it if there is one; RESET is a paperclip hole. PLA or PETG, 0.4 mm nozzle, no
-supports: the base open side up, the lid and the button as they come.
-
-The page's **Case** tab also says how each piece prints and goes together (the four files are already the right way up on
-the bed; no supports). It makes yours in the browser (OpenSCAD in WebAssembly, and a 3D view): pick the board and a
-battery, and download the STLs — everything else (the outline, where the two switches are, how big the button is) comes
-from the board. `case/lilfm1buddy-case.scad` is the model (`openscad` or `tools/cases.sh` for all of them), and
-`tools/cases.sh` writes them to `build/cases/`.
-
-The numbers are measured, not guessed: the XIAOs' outline and switches are Seeed's own KiCad (K1 is RESET, K2 BOOT:
-both 1.65 mm from the USB-C end, mirrored across the width, 3.05 and 14.73 mm from the long edges), and the
-Waveshare's are from its published STEP model (PCB 18.02 x 23.52 x 1.6; its USB-C 8.94 wide, 1.22 past the edge and
-3.25 above the top face, since it is on the component side; its two switches 8.67 mm from the USB-C end, 13.24 and
-4.89 mm across, 1.6 high). The board sits 4.0 mm back from the USB-C wall (usb_inset), which is what gives the BOOT
-button's lip room under the lid's plate; the USB-C gets a slot through both the wall and the lid's skirt, from below
-the board's top face to 0.5 mm over the connector.
-
-The model is checked, not trusted: `part="fit"` (the case against a stand-in for the board), `part="fit_button"` (the
-button's neck, lip and stem against the lid) and `part="fit_usb"` (the USB-C plug's way in) each have to come out
-empty, and do for every board, with and without a battery. It also refuses a battery the case can't hold and a cap that
-would reach RESET's switch. Its cap is 7 mm and pressed into the lid — the
-switches sit about 3 mm from their boards' long edges, where a snap's ring would have to hang under the wall.
-
 `tools/lil.py` drives a board on this computer, with no buttons (for a script, or an agent working on it): `disk`
 (mounts its drive, prints where), `eject` (its serial port), `flash ENV` (installs the program, then it's the drive
 again), and any of its commands (`info`, `ls`, `log`, `read OFF LEN NAME`, `rm NAME`). A new menu: build it

@@ -1,35 +1,21 @@
 // The lilfm1buddy case: the board that plugs into the FM-1's USB port, in a box you can pick up. Snap-fit, no screws,
-// three pieces: the base, the lid, and the BOOT button's own insert (so the button prints without the lid's overhang,
-// and can be another colour). Printed without supports: the base open side up, the lid top face down, the button
-// flange down.
+// three pieces: the base, the lid, and the BOOT button (a flange on the lid, a neck through its hole, and a lip under
+// the plate so it stays). Printed without supports: the base open side up, the lid skirt up, the button flange down.
 //
-//   part    base, lid, button, preview (the case closed, with a stand-in for the board), view_* (the page's pieces)
-//   board   the preset (xiaoplus, xiao, zero, devkit): its outline, and how far its USB-C sticks out
-//   battery room for a flat LiPo under the board
-//   boot    the BOOT switch's centre: from the USB-C end, and from the left wall (looking at the board's top with its
-//   reset   USB-C to the left). RESET gets a paperclip hole.
+//   part    base, lid, button, preview (the case closed, with a stand-in for the board), view_* (the page's pieces),
+//           fit / fit_usb (the checks: each must come out empty)
+//   board   one of BOARDS below: its outline, its USB-C, its switches, from its maker's own CAD
+//
+// The board lies flat, buttons up, its battery pads down. x from its USB-C end, y across it (0 at the long edge that
+// is at the bottom of a top view with the USB-C on the left), z up from the floor's inside.
 //
 // openscad -D 'part="lid"' -D 'board="zero"' -o lid.stl case/lilfm1buddy-case.scad   (tools/cases.sh makes them all)
-//
-// x from the USB-C end of the board, y across it, z up from the floor's inside. The board lies flat, its buttons up, its
-// battery pads down.
 
 /* [What] */
-part = "preview"; // [preview, base, lid, button, view_lid, view_button, view_board, view_battery]
-board = "xiaoplus"; // [xiaoplus, xiao, zero, devkit]
+part = "preview"; // [preview, base, lid, button, view_lid, view_button, view_board, view_battery, fit, fit_button, fit_usb]
+board = "xiaoplus"; // [xiaoplus, xiao, zero]
 battery = false;
 section = false;  // preview: cut in half, to see the inside
-
-/* [The board] */
-board_l = 0;  // 0: the preset's (mm); yours, if it's different
-board_w = 0;
-usb_inset = 4.5;  // how far the board sits back from the USB-C wall: a big BOOT cap over a switch right at its end
-// The XIAO ESP32S3 and Plus, from Seeed's published KiCad (K1 is EN/RESET, K2 is GPIO0/BOOT): both switches 1.65 mm
-// from the USB-C end, and mirrored across the width, 3.05 mm from their long edges.
-boot = [1.65, 3.05];  // BOOT's centre: from the USB-C end, from the left wall
-reset = [1.65, 14.73];
-btn_d = 7;  // the BOOT button's cap: the lid's hole is this wide (it has to fit between the switch and the case's edge)
-reset_d = 2.5;  // the paperclip's hole
 
 /* [Battery] */
 bat = [35, 30, 5];  // room under the board: a 503035 (500 mAh) is 35 x 30 x 5
@@ -39,48 +25,83 @@ name = true;  // the lid's top face: "lilbuddy" cut into it (Arial Bold's outlin
 name_h = 2.2;  // its x-height
 
 /* [Fit] */
-wall = 1.6;
+wall = 1.4;
 floor_t = 1.2;
 lid_t = 1.4;
-gap = 0.4;  // around the board
-fit = 0.2;  // between the lid's lip and the walls
-snap = 0.5;  // how far the lid's ridges reach into the walls' grooves
-preload = 0.1;  // how much the ridges pull the lid down onto the walls (no rattle)
-clear = 0.3;  // between the board and the lid's ribs
+usb_inset = 4.0;  // how far the board sits back from the USB-C wall: room for the button's lip under the lid
+gap = 0.35;  // around the board (a printed case for this board uses 0.3)
+fit = 0.35;  // between the lid's skirt and the walls
+snap = 0.3;  // how far the lid's ridges reach into the grooves
+preload = 0.05;  // how much they pull the lid down (no rattle)
+clear = 1.0;  // over the board's tallest part, to the lid
+under = 0.4;  // between the board's underside and the floor (or the battery)
 
 $fn = 48;
 LID_COLOR = "#ff8a3d";
 BASE_COLOR = "#36b37e";
-PCB = 1.6;  // every board here
-ABOVE = 1.4;  // its BOOT and RESET switches, above the PCB
-UNDER = 1.0;  // its tallest parts underneath (pads, flash)
-USB_H = 3.4;  // its USB-C, around the PCB's middle
-USB_SLOT_W = 13;  // the opening: the plug, and a little of the overmold that comes with it
-USB_SLOT_H = 3.8;  // (the wall above keeps a band to bridge it)
 eps = 0.01;
 
-// --------------------------------------------------------------------------------------------- boards ---
-// name, length (the USB-C end first), width, the USB-C's width, how far it sticks out past the PCB
-BOARDS = [["xiaoplus", 21.15, 17.78, 9.0, 0.0], ["xiao", 21.15, 17.78, 9.0, 0.0], ["zero", 23.5, 18, 9.0, 1.3], ["devkit", 52, 25.4, 9.0, 0.0]];
+
+// ------------------------------------------------------------------------------------------- boards ---
+// The numbers below are measured, not guessed. board: length along the USB-C axis, width, PCB thickness, the USB-C's
+// width, how far its shell reaches past the board's edge, how high it stands above the board's top face, where the two
+// switches are (their centres, from the USB-C end and from the long edge at the bottom of a top view with the USB-C on
+// the left), how far the connector reaches in (its shell), its height, the switches' height and body size, the cap.
+//   xiaoplus, xiao   Seeed's published KiCad of the XIAO ESP32S3 Plus (and of the XIAO): the outline is its Edge.Cuts,
+//                    its USB-C's pads reach 10.2 mm in from the edge, K1 is RESET and K2 BOOT, 2.8 x 2.6 and 1.6 high. The one number the KiCad can't give is how high the
+//                    USB-C stands above the board: 3.2 is what a 16-pin receptacle does (and it only has to be cleared).
+//   zero             Waveshare's STEP model of the ESP32-S3-Zero, measured here: PCB 18.02 x 23.52 x 1.6, the USB-C
+//                    8.94 wide, 1.22 past the edge and 3.25 above the top face (it is on the component side), its two
+//                    switches 2.5 x 3.0 and 1.6 high with their actuator, at 8.67 mm from the USB-C end, 13.24 and
+//                    4.89 mm across (BOOT is the far one: the owner's first print had its hole on the wrong side,
+//                    mirrored across the board).
+BOARDS = [
+  ["xiaoplus", 21.15, 17.78, 1.6, 8.94, 0.0, 10.2, 3.2, 1.6, 2.8, 2.6, [1.65, 3.05], [1.65, 14.73], 7],
+  ["xiao", 21.15, 17.78, 1.6, 8.94, 0.0, 10.2, 3.2, 1.6, 2.8, 2.6, [1.65, 3.05], [1.65, 14.73], 7],
+  ["zero", 23.52, 18.02, 1.6, 8.94, 1.22, 6.4, 3.25, 1.6, 3.0, 2.5, [8.67, 13.24], [8.67, 4.89], 8]
+];
+
+// ------------------------------------------------------------------------------------------- numbers ---
 B = [for (b = BOARDS) if (b[0] == board) b][0];
-USB_OUT = B[4];
-L = (board_l > 0 ? board_l : B[1]) + USB_OUT;  // (a connector that reaches past the board's edge)
-W = board_w > 0 ? board_w : B[2];
-USB_W = B[3];
+L = B[1];  // the board's own outline (its USB-C's overhang is outside it, inside the wall's slot)
+W = B[2];
+PCB = B[3];
+USB_W = B[4];
+USB_OUT = B[5];
+USB_LEN = B[6];
+USB_H = B[7];
+SW_H = B[8];
+SW_W = B[9];
+SW_D = B[10];
+boot = B[11];
+reset = B[12];
 
-// the heights: the board's underside, its top, and the lid's underside
-UNDER_GAP = 0.6;  // between the board's parts and what's under them
-shelf_h = (battery ? bat.z + 0.8 : 0) + UNDER + UNDER_GAP;
-board_top = shelf_h + PCB;
-inner_h = board_top + ABOVE + clear;
-rib = ABOVE + clear - 0.2;  // the lid's ribs: down to just over the board
+// the heights: the board's underside, its top, the tallest thing on it, and the lid's underside
+UNDER = (battery ? bat.z + 0.8 : 0) + under;          // the board's underside
+SHELF_T = max(0.3, UNDER - (battery ? bat.z + 0.6 : 0));  // the ledge under it (clears the battery)
+board_top = UNDER + PCB;
+inner_h = board_top + max(USB_H, SW_H) + clear;
+rib = inner_h - board_top - 0.2;  // the lid's ribs: down to just over the board
 
-// ------------------------------------------------------------------------------------------- frames ---
-// the board's corner (its USB-C end, its left long edge) is [0, 0]; the cavity around it, after the gap
+// the board's corner (its USB-C end, its long edge) is [0, 0]; the cavity around it, after the gap
 b0 = [0, 0];
 b1 = [L, W];
-k0 = [b0.x - gap - usb_inset, b0.y - gap];  // (the USB-C end gets the extra room)
+k0 = [b0.x - gap - usb_inset, b0.y - gap];
 k1 = b1 + [gap, gap];
+
+// the button: as big as the table says, or as the case allows. Its lip (under the lid's plate) has to stay inside
+// the walls, and its flange inside the lid's edge
+edge = min(boot.x + gap + usb_inset, L - boot.x + gap, boot.y + gap, W - boot.y + gap);  // to the walls' inside
+btn_d = floor(min(B[13], 2 * (edge - 0.3) - 0.4, 2 * (edge + wall) - 3) * 2) / 2;
+assert(btn_d >= 4.5, "no room for a BOOT button there");
+
+USB_SLOT_W = USB_W + 3.6;  // the plug, and a little of the overmold that comes with it
+USB_SLOT_Z0 = board_top - 0.9;  // the connector's shell reaches below the board's top face too
+USB_SLOT_Z1 = board_top + USB_H + 0.5;
+
+groove_d = snap + 0.35;
+groove_z = inner_h - 3.2;
+lid_top = inner_h + lid_t;
 
 // ------------------------------------------------------------------------------------------- shapes ---
 module rbox(p0, p1, r = 1.5) {
@@ -88,41 +109,14 @@ module rbox(p0, p1, r = 1.5) {
   translate([p0.x + r, p0.y + r, p0.z]) linear_extrude(s.z) offset(r) square([s.x - 2 * r, s.y - 2 * r]);
 }
 
-// the USB-C's opening: through the wall, and on to the board (it sits usb_inset back): w across (y), h up (z)
-module wall_hole(c, w, h) {
-  translate([k0.x - wall - 1, c.y - w / 2, c.z - h / 2]) cube([wall + usb_inset + gap + 2, w, h]);
+// the USB-C's opening: through the wall, and on to the board (it sits usb_inset back). dz: the caller's frame
+module usb_slot(x0, x1, dz = 0) {
+  translate([x0, W / 2 - USB_SLOT_W / 2, USB_SLOT_Z0 - dz]) cube([x1 - x0, USB_SLOT_W, USB_SLOT_Z1 - USB_SLOT_Z0]);
 }
 
 // a 45 degree ridge (or groove) along x, centered on c, reaching d either side of it
 module ridge(c, len, d) {
   translate(c) rotate([0, 90, 0]) linear_extrude(len, center = true) rotate(45) square(d * sqrt(2), center = true);
-}
-
-// ---------------------------------------------------------------------------------------- the base ---
-groove_d = snap + 0.35;
-groove_z = inner_h - 3.2;  // (the lid's ridges, and the grooves they take)
-module base() {
-  difference() {
-    union() {
-      difference() {
-        rbox([k0.x - wall, k0.y - wall, -floor_t], [k1.x + wall, k1.y + wall, inner_h], 3);
-        rbox([k0.x, k0.y, 0], [k1.x, k1.y, inner_h + 1], 1.2);
-      }
-      // the shelf the board rests on, 1.4 wide, around the inside
-      difference() {
-        rbox([k0.x, k0.y, shelf_h - 1.4], [k1.x, k1.y, shelf_h], 1.2);
-        rbox([k0.x + 1.4, k0.y + 1.4, shelf_h - 2], [k1.x - 1.4, k1.y - 1.4, shelf_h + 1], 1);
-        if (battery) translate([k0.x - 1, W / 2 - 3, shelf_h - 2]) cube([3.6, 6, 2.2]);  // (the battery's leads)
-        // room under the USB-C's shell, which reaches below the board at its end (the shelf holds the board's edges)
-        translate([k0.x - 1, W / 2 - USB_W / 2 - 0.8, shelf_h - UNDER - 0.4]) cube([3.4, USB_W + 1.6, UNDER + 0.6]);
-      }
-    }
-    // the snap grooves, in the outside of both long walls (the lid's skirt clicks into them)
-    for (y = [k0.y - wall, k1.y + wall]) ridge([(k0.x + k1.x) / 2, y, groove_z], (k1.x - k0.x) * 0.55, groove_d);
-    // the USB-C, through its end (a tunnel, to the board)
-    wall_hole([0, W / 2, shelf_h + PCB / 2], max(USB_SLOT_W, USB_W + 0.6), USB_SLOT_H);
-    // paperclip holes up through the floor, if asked for
-  }
 }
 
 // "lilbuddy", as the outlines of Arial Bold, flattened and scaled to an x-height of 4: the browser's OpenSCAD has no
@@ -168,52 +162,95 @@ module name_cut() {
   }
 }
 
-// ----------------------------------------------------------------------------------------- the lid ---
+
+// -------------------------------------------------------------------------------------------- base ---
+module base() {
+  difference() {
+    union() {
+      difference() {
+        rbox([k0.x - wall, k0.y - wall, -floor_t], [k1.x + wall, k1.y + wall, inner_h], 3);
+        rbox([k0.x, k0.y, 0], [k1.x, k1.y, inner_h + 1], 1.2);
+      }
+      // the shelf the board rests on, 2 wide around the inside (thin enough to clear the battery, if there is one)
+      difference() {
+        rbox([k0.x, k0.y, UNDER - SHELF_T], [k1.x, k1.y, UNDER], 1.2);
+        rbox([k0.x + 2, k0.y + 2, UNDER - SHELF_T - 1], [k1.x - 2, k1.y - 2, UNDER + 1], 1);
+        if (battery) translate([k0.x - 1, W / 2 - 3, UNDER - SHELF_T - 1]) cube([4.5, 6, SHELF_T + 1.2]);  // (leads)
+        // room under the USB-C's shell, which reaches below the board's top face at its end
+        translate([k0.x - 1, W / 2 - USB_W / 2 - 1, UNDER - SHELF_T - 1]) cube([4.5, USB_W + 2, SHELF_T + 1.2]);
+      }
+    }
+    // the snap grooves, in the outside of both long walls (the lid's skirt clicks into them)
+    for (y = [k0.y - wall, k1.y + wall]) ridge([(k0.x + k1.x) / 2, y, groove_z], (k1.x - k0.x) * 0.55, groove_d);
+    // the USB-C, through its end (a tunnel, to the board)
+    usb_slot(k0.x - wall - 1, k0.x + 1);
+  }
+}
+
+// --------------------------------------------------------------------------------------------- lid ---
 module lid() {
   translate([0, 0, inner_h]) difference() {
     union() {
       difference() {
         union() {
-          rbox([k0.x - wall - 0.3, k0.y - wall - 0.3, 0], [k1.x + wall + 0.3, k1.y + wall + 0.3, lid_t], 3);  // the plate
-          difference() {  // the skirt, outside the walls
+          rbox([k0.x - wall - 0.3, k0.y - wall - 0.3, 0], [k1.x + wall + 0.3, k1.y + wall + 0.3, lid_t], 3);  // plate
+          difference() {  // the skirt, outside the walls, its bottom edge chamfered to start over them
             rbox([k0.x - wall - 0.3, k0.y - wall - 0.3, -4.2], [k1.x + wall + 0.3, k1.y + wall + 0.3, 0], 3);
-            rbox([k0.x - wall + fit, k0.y - wall + fit, -5], [k1.x + wall - fit, k1.y + wall - fit, 1], 2.6);
+            rbox([k0.x - wall + fit, k0.y - wall + fit, -4.2 - 1], [k1.x + wall - fit, k1.y + wall - fit, 1], 2.6);
+            translate([k0.x - wall - 0.4, k0.y - wall - 0.4, -4.2 - 1])
+              rbox([k0.x - wall + fit + 0.8, k0.y - wall + fit + 0.8, -4.2 - 1], [k1.x + wall - fit - 0.8, k1.y + wall - fit - 0.8, -4.2 + 0.8], 2.6);
           }
         }
         // ribs, down to just over the board's top (they hold it down on its shelf)
         for (y = [b0.y + 0.6, b1.y - 0.6]) translate([b0.x + 2.5, y - 1.6, -rib]) cube([L - 5, 3.2, rib]);
       }
-      // the ridges the grooves take: on the skirt's inside, its bottom edge chamfered so it starts over the walls
+      // the ridges the grooves take, on the skirt's inside
       for (y = [k0.y - wall + fit, k1.y + wall - fit]) intersection() {
-        ridge([(k0.x + k1.x) / 2, y, -2.4], (k1.x - k0.x) * 0.45, fit + snap);
+        ridge([(k0.x + k1.x) / 2, y, -2.6], (k1.x - k0.x) * 0.45, fit + snap);
         translate([k0.x - wall, y < W / 2 ? y - 5 : y, -4.2]) cube([k1.x - k0.x + 2 * wall, 5, 4.2]);
       }
     }
-    // the same opening, through the skirt (it wraps the walls, and would otherwise cover it)
-    translate([k0.x - wall - 1, W / 2 - USB_SLOT_W / 2, shelf_h + PCB / 2 - USB_SLOT_H / 2 - inner_h])
-      cube([wall + 2, USB_SLOT_W, USB_SLOT_H + 0.1]);
-    if (name) name_cut();
-    // BOOT's hole (its edge chamfered, the button's plug goes in from outside); RESET's, for a paperclip
+    // BOOT's hole (chamfered to take the button's lip); RESET's, for a paperclip
     translate([boot.x, boot.y, -1]) cylinder(d = btn_d, h = lid_t + 2);
-    translate([boot.x, boot.y, -0.6]) cylinder(d1 = btn_d + 0.8, d2 = btn_d, h = 0.6);
-    translate([reset.x, reset.y, -1]) cylinder(d = reset_d, h = lid_t + 2);
-    translate([reset.x, reset.y, -1]) cylinder(d = reset_d + 1.0, h = 0.45);
+    translate([boot.x, boot.y, -0.5]) cylinder(d1 = btn_d + 0.6, d2 = btn_d, h = 0.5);
+    translate([reset.x, reset.y, -1]) cylinder(d = 2.5, h = lid_t + 2);
+    translate([reset.x, reset.y, -1]) cylinder(d = 3.4, h = 0.5);
+    // the same USB-C slot as the base's: the skirt wraps the walls, and would cover it (this frame is inner_h up)
+    usb_slot(k0.x - wall - 1, k0.x + 2, inner_h);
+    if (name) name_cut();
   }
 }
 
-// -------------------------------------------------------------------------------------- the button ---
-// in the case's own frame: a flange on the lid, a plug pressed into its hole, and a stem that comes down onto the
-// switch. Pressed in, not clicked: the switches are close to the boards' edges, where a snap's ring would have to hang
-// under the wall. Printed flange down (z 0: the bed)
+// ------------------------------------------------------------------------------------------ button ---
+// the flange on the lid, the neck through its hole, the lip under the plate (so it can't fall out, and doesn't need a
+// press fit), and the stem onto the switch. Printed flange down: z 0 is the bed
 FLANGE = 1.0;
-PRESS = 0.15;  // how much wider the plug is than the hole: the lid's plate gives a little, and it holds
-lid_top = inner_h + lid_t;
-module button_case() {
-  translate([boot.x, boot.y, 0]) union() {
-    translate([0, 0, lid_top]) cylinder(d = btn_d + 2.0, h = FLANGE);  // on the lid, to press
-    translate([0, 0, inner_h - eps]) cylinder(d = btn_d + PRESS, h = lid_t + 2 * eps);  // pressed into the hole
-    translate([0, 0, board_top + ABOVE]) cylinder(d = 3.4, h = inner_h - board_top - ABOVE + 0.15);  // onto the switch
+NECK = 0.3;  // clearance each side, through the hole
+LIP = 0.7;  // the lip's height, under the plate
+LIP_OUT = 0.6;  // how much wider than the hole it is, in all (so it clips in and stays)
+SLITS = 4;  // through the lip, so it can squeeze in
+
+module button_body() {  // the neck, the lip and the stem: everything under the flange
+  translate([boot.x, boot.y, 0]) {
+    translate([0, 0, inner_h - eps]) cylinder(d = btn_d - 2 * NECK, h = lid_t + 2 * eps);  // the neck
+    translate([0, 0, inner_h - LIP - 0.02]) {  // the lip, just under the plate
+      difference() {
+        union() {
+          cylinder(d = btn_d + LIP_OUT, h = LIP);
+          cylinder(d1 = btn_d - 2 * NECK, d2 = btn_d + LIP_OUT, h = 0.5);  // (the lead-in, under it)
+        }
+        translate([0, 0, -eps]) cylinder(d = btn_d - 2 * NECK - 1.8, h = LIP + 2 * eps);
+        for (a = [0 : SLITS - 1]) rotate([0, 0, 360 * a / SLITS]) translate([-0.45, btn_d / 2 - 0.1, -eps])
+          cube([0.9, 10, LIP + 2 * eps]);
+      }
+    }
+    translate([0, 0, board_top + SW_H + 0.1]) cylinder(d = 2.4, h = inner_h - LIP - board_top - SW_H - 0.1);  // to just over the switch
   }
+}
+
+module button_case() {  // in the case's frame: its flange on the lid's top face
+  translate([boot.x, boot.y, lid_top]) cylinder(d = btn_d + 3, h = FLANGE);  // on the lid, to press
+  button_body();
 }
 
 // printed flange down: the same, flipped about the flange's top
@@ -224,9 +261,9 @@ module button_print() {
 
 // ----------------------------------------------------------------------------------------- preview ---
 module stand_in(shrink = 0) {
-  translate([shrink, shrink, shelf_h + shrink]) color("#222") cube([L - 2 * shrink, W - 2 * shrink, PCB]);
-  for (b = [boot, reset]) translate([b.x, b.y, board_top + (ABOVE - 0.1) / 2]) color("#666") cube([4.4, 4.4, ABOVE - 0.1], center = true);
-  color("#aaa") translate([-USB_OUT + 0.1, W / 2 - USB_W / 2 + 0.1, shelf_h + PCB / 2 - USB_H / 2 + 0.1]) cube([3, USB_W - 0.2, USB_H - 0.2]);
+  translate([shrink, shrink, UNDER + shrink]) color("#222") cube([L - 2 * shrink, W - 2 * shrink, PCB]);
+  for (b = [boot, reset]) translate([b.x, b.y, board_top + SW_H / 2]) color("#666") cube([SW_D, SW_W, SW_H], center = true);
+  color("#aaa") translate([-USB_OUT + 0.1, W / 2 - USB_W / 2 + 0.1, board_top + 0.1]) cube([USB_LEN + USB_OUT - 0.1, USB_W - 0.2, USB_H - 0.2]);
   if (battery) translate([k0.x + 0.4, k0.y + 0.4, 0.4]) color("silver") cube([min(bat.x, L + 2 * gap - 0.8), min(bat.y, W + 2 * gap - 0.8), bat.z]);
 }
 
@@ -250,7 +287,9 @@ cut() {
   }
   if (part == "view_lid") color(LID_COLOR) lid();
   if (part == "view_button") color(LID_COLOR) button_case();
-  if (part == "fit") intersection() {  // (nothing: it must be empty. The board shrunk, so resting on it doesn't count)
+  if (part == "view_board") stand_in();
+  if (part == "view_battery") if (battery) translate([k0.x + 0.4, k0.y + 0.4, 0.4]) color("silver") cube([min(bat.x, L + 2 * gap - 0.8), min(bat.y, W + 2 * gap - 0.8), bat.z]);
+  if (part == "fit") intersection() {  // (nothing: the case must not touch the board)
     union() {
       base();
       lid();
@@ -258,31 +297,23 @@ cut() {
     }
     stand_in(0.08);
   }
-  if (part == "fit_base") intersection() {
-    base();
-    stand_in(0.08);
-  }
-  if (part == "fit_lid") intersection() {
+  if (part == "fit_button") intersection() {  // (nothing: everything under the flange, and the lid)
     lid();
-    stand_in(0.08);
+    button_body();
   }
-  if (part == "fit_button") intersection() {
-    button_case();
-    stand_in(0.08);
+  if (part == "fit_usb") intersection() {  // (nothing: the USB-C plug's way in)
+    union() {
+      base();
+      lid();
+    }
+    translate([k0.x - wall - 0.5, W / 2 - USB_W / 2, board_top - 0.8]) cube([wall + usb_inset + gap + 1, USB_W, USB_H + 0.8]);
   }
-  if (part == "view_board") stand_in();
-  if (part == "view_battery") if (battery) translate([k0.x + 1, k0.y + 1, 0.4]) color("silver") cube([min(bat.x, L + 2 * gap - 2), min(bat.y, W + 2 * gap - 2), bat.z]);
 }
 
-assert(!battery || (bat.x <= L + 2 * gap - 0.4 && bat.y <= W + 2 * gap - 0.4), "that battery is too big for this board's case: it goes under the board, inside its walls");
+// the model refuses what can't work
+assert(!battery || (bat.x <= L + 2 * gap - 0.4 && bat.y <= W + 2 * gap - 0.4), "that battery is too big for this board's case");
 assert(!battery || bat.z > 0, "the battery needs a thickness");
 assert(boot.x > 0 && boot.x < L && boot.y > 0 && boot.y < W, "BOOT isn't on the board");
 assert(reset.x > 0 && reset.x < L && reset.y > 0 && reset.y < W, "RESET isn't on the board");
-assert(btn_d > 4 && btn_d < min(L, W), "the button's cap doesn't fit the board");
-// its flange, on the lid, has to be inside the lid's edge (and clear of the wall's top: nothing hangs under it)
-assert(min(boot.y - k0.y + wall + 0.3, k1.y - boot.y + wall + 0.3, boot.x - k0.x + wall + 0.3, k1.x - boot.x + wall + 0.3) >=
-           (btn_d + 2) / 2 + 0.3,
-       "the BOOT button's cap would hang over the case's edge: the switch is too close to it");
-// the cap, and RESET's switch (4.4 square: 2.2 from its centre), mustn't touch: pressing BOOT must not press RESET.
-// (The switches are the board's; moving BOOT or RESET, or a smaller cap, is the fix.)
-assert(norm(boot - reset) >= (btn_d + 2) / 2 + 2.2 + 0.3, "the BOOT button's cap would reach RESET's switch: move one of them, or make the cap smaller");
+// the button's cap must not reach RESET's switch (4.4 square: 2.2 from its centre) or hang over the case's edge
+assert(norm(boot - reset) >= (btn_d + 3) / 2 + 2.2 + 0.3, "the BOOT button's cap would reach RESET's switch");

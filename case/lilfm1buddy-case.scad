@@ -290,15 +290,19 @@ module button(c, sw, out, dz = 0, peg = true, flange = true) {
   z_top = ZTOP + out;
   translate([0, 0, -dz]) difference() {
     union() {
-      if (flange) translate([c.x, c.y, 0]) {
-        intersection() {
-          union() {
-            translate([0, 0, ZP - 0.1]) cylinder(r1 = rf, r2 = rc - 0.3, h = rf - rc + 0.3);
-            translate([0, 0, ZP - 0.1]) cylinder(r = rc, h = z_top - ZP + 0.1);
-          }
-          translate([0, 0, ZP - 1]) linear_extrude(z_top - ZP + 2) cap_2d(rf, flat);
+      if (flange) translate([c.x, c.y, 0]) intersection() {
+        union() {
+          translate([0, 0, ZP - 0.1]) cylinder(r1 = rf, r2 = rc - 0.3, h = rf - rc + 0.3);
+          translate([0, 0, ZP - 0.1]) cylinder(r = rc, h = z_top - ZP + 0.1);
+          translate([0, 0, ZP - 0.7]) cylinder(r = rf, h = 0.6 + eps);
         }
-        translate([0, 0, ZP - 0.7]) cylinder(r = rf, h = 0.6 + eps);
+        // a keyed cap's flat, through the hole; under it, where the seat is round, a 45 degree face down to the
+        // flange's edge (printed cap down, a flat cut there would leave the flange's rim hanging in the air)
+        if (flat != undef) union() {
+          translate([0, 0, ZP - 1]) linear_extrude(z_top - ZP + 2) cap_2d(rf, flat);
+          translate([0, flat, ZP + 0.6]) rotate([45, 0, 0]) translate([-50, -100, -50]) cube(100);
+        }
+        else translate([-50, -50, -50]) cube(100);
       }
       if (peg) translate([sw.x, sw.y, SW_TOP + press_gap]) cylinder(d = PEG, h = ZP - 0.7 - SW_TOP - press_gap + eps);
     }

@@ -123,10 +123,11 @@ doesn't need it; a `mflr-loader.bin` on the drive is used instead, to try a new 
 Four printed pieces that snap together, no screws, no supports: the shell (the top and the walls, printed top face
 down), the base (it clicks into the shell's open bottom), and the two buttons. BOOT is the big one and stands out a
 little; RESET is flush, so it isn't pressed by accident and needs no paperclip. Each button goes into its hole from
-inside, and a flange under the top keeps it there. The LED shows through the top (on the XIAOs, through the buttons,
-which sit over their LEDs). The base's lips push the board up onto rails under the top with a springy strip, and its
-ridges pull it up against the walls: nothing rattles. On the XIAOs there's room for a battery under the board, and a
-channel for the antenna's cable.
+inside, and a flange under the top keeps it there; one whose peg is off its centre is keyed (a flat, or on the XIAOs a
+tab in a slot through the top), so it can't turn off its switch. The LED shows through the top (on the XIAOs, through
+the buttons, which sit over their LEDs). The base's lips push the board up onto rails under the top with a springy
+strip, and its ridges pull it up against the walls: nothing rattles. On the XIAOs there's room for a battery under the
+board, and a channel for the antenna's cable.
 
 The page's **Case** tab makes yours in the browser (OpenSCAD in WebAssembly, with a 3D view): pick the board and a
 battery, and download the three STLs. It also says how to print it and put it together. `case/lilfm1buddy-case.scad`

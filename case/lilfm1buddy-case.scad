@@ -6,7 +6,9 @@
 //   base     snaps into the shell's open bottom (a ridge on each long side clicks into a groove in the walls, and pulls
 //            the base up against them). Its lips push the board up onto the rails with a springy strip: no rattle
 //   buttons  BOOT (bigger, and it stands out) and RESET (flush: no paperclip, and it isn't pressed by accident). Each
-//            goes into its hole from inside: a flange under the top keeps it there, and a peg presses the switch
+//            goes into its hole from inside: a flange under the top keeps it there, and a peg presses the switch. One
+//            whose peg is off its centre is keyed, so it can't turn off its switch: a flat (the Zero's BOOT, 0.3 off) or
+//            a tab in a slot through the top (the XIAOs', 1.2 .. 1.8 off: a flat that shallow let them turn)
 //
 //   part     preview (the case closed, with a stand-in for the board), shell, base, buttons (to print), view_* (the
 //            page's pieces), fit_* (the checks: tools/cases.sh --check)
@@ -47,6 +49,8 @@ lip_t = 1.2;
 spring = 0.35; // how far the lips' bumps press the board up (the strip under them gives up to 0.8)
 press_gap = 0.15; // between a button's peg and its switch, at rest
 btn_clear = 0.2; // around a button in its hole
+key_w = 1.2; // a button's tab (the XIAOs): how wide, and it stands 0.6 out of the cap
+key_clear = 0.15; // either side of the tab, in its slot
 led_d = 1.6; // the LED's hole in the top (the Zero)
 light_d = 1.2; // the LED's hole through a button (the XIAOs)
 
@@ -71,7 +75,8 @@ BUTTON_COLOR = "#f4f4f4";
 // boot, reset: the switches' centres; sw: their top, and the peg's diameter. leds: the LEDs' centres. caps: each button
 // [x, y, diameter] (the peg is under the switch, the cap may sit beside it). rails: the y range of the rails along the
 // left and right edges (clear of the flanges). parts: boxes [x0, y0, x1, y1, height] to keep out of. ufl: the antenna's
-// socket. light: the LEDs show through the buttons (or through holes of their own).
+// socket. light: the LEDs show through the buttons (or through holes of their own). key: how a keyed button is kept
+// from turning, "flat" or "tab".
 BOARDS = [
   ["zero", [
     ["size", [18.02, 23.52, 1.6]],
@@ -79,7 +84,7 @@ BOARDS = [
     ["boot", [13.23, 14.85]], ["reset", [4.88, 14.85]], ["sw", [1.6, 1.4]],
     ["leds", [[9.10, 14.83]]],
     ["boot_cap", [13.55, 14.85, 4.8]], ["reset_cap", [4.88, 14.85, 3.4]],
-    ["light", false],
+    ["light", false], ["key", "flat"],
     ["rails", [[1.5, 22.0], [1.5, 22.0]]],
     ["parts", [
       [3.95, 2.69, 14.06, 12.80, 1.0], // the ESP32-S3
@@ -96,7 +101,7 @@ BOARDS = [
     ["boot", [14.81, 19.36]], ["reset", [2.96, 19.37]], ["sw", [0.73, 1.2]],
     ["leds", [[2.96, 17.16], [14.86, 17.15]]],
     ["boot_cap", [14.45, 17.65, 5.0]], ["reset_cap", [3.0, 18.15, 4.2]],
-    ["light", true],
+    ["light", true], ["key", "tab"],
     ["rails", [[1.5, 15.0], [1.5, 14.0]]],
     ["parts", [
       [2.59, 3.64, 15.19, 14.24, 2.0], // the shield
@@ -111,7 +116,7 @@ BOARDS = [
     ["boot", [14.73, 19.48]], ["reset", [3.05, 19.48]], ["sw", [0.73, 1.2]],
     ["leds", [[3.05, 17.27], [14.78, 17.27]]],
     ["boot_cap", [14.45, 17.8, 5.0]], ["reset_cap", [3.05, 18.25, 4.2]],
-    ["light", true],
+    ["light", true], ["key", "tab"],
     ["rails", [[1.5, 15.0], [1.5, 14.3]]],
     ["parts", [
       [2.6, 3.6, 15.2, 14.3, 2.0], // the ESP32-S3 (as if shielded)
@@ -134,6 +139,7 @@ USB = b("usb");
 SW_TOP = b("sw")[0];
 PEG = b("sw")[1];
 LIGHT = b("light");
+KEY = b("key");
 UFL = b("ufl");
 
 // ------------------------------------------------------------------------------------------- heights ---
@@ -184,8 +190,12 @@ module ridge(x, y, z, len, d) {
 }
 
 // a button's outline: round, or with a flat on its +y side (a cap whose peg or light hole is off its centre must
-// not turn)
+// not turn). Or round with a tab on its -y side, 0.6 out: a flat 0.6 deep only met the top's last 0.7 (the seat
+// takes the rest), and the XIAOs' caps turned in it; the tab's slot runs through the whole top
 function keyed(c, sw) = LIGHT || norm([c.x, c.y] - sw) > 0.05;
+function flat(c, sw) = keyed(c, sw) && KEY == "flat" ? c[2] / 2 - 0.6 : undef;
+function tabbed(c, sw) = keyed(c, sw) && KEY == "tab";
+module tab_2d(rt, w) translate([-w / 2, -rt]) square([w, rt]);
 module cap_2d(r, flat) {
   if (flat == undef) circle(r);
   else intersection() {
@@ -200,7 +210,8 @@ module button_hole(c, sw) {
   rh = rc + btn_clear;
   rf = rc + 0.8;
   translate([c.x, c.y, 0]) {
-    translate([0, 0, ZP - 1]) linear_extrude(plate + 2) cap_2d(rh, keyed(c, sw) ? rc - 0.6 + btn_clear : undef);
+    translate([0, 0, ZP - 1]) linear_extrude(plate + 2) cap_2d(rh, flat(c, sw) == undef ? undef : flat(c, sw) + btn_clear);
+    if (tabbed(c, sw)) translate([0, 0, ZP - 1]) linear_extrude(plate + 2) tab_2d(rc + 0.6 + key_clear, key_w + 2 * key_clear);
     // its seat: the flange's cone fits it (running on into the hole, and turned half a facet: so the two don't meet
     // edge on edge)
     translate([0, 0, ZP - eps]) rotate(180 / 48) cylinder(r1 = rf + eps, r2 = rh - 0.3, h = rf - rh + 0.3 + 2 * eps);
@@ -287,7 +298,7 @@ module base(bump = true) {
 module button(c, sw, out, dz = 0, peg = true, flange = true) {
   rc = c[2] / 2;
   rf = rc + 0.8;
-  flat = keyed(c, sw) ? rc - 0.6 : undef;
+  flat = flat(c, sw);
   z_top = ZTOP + out;
   translate([0, 0, -dz]) difference() {
     union() {
@@ -305,6 +316,8 @@ module button(c, sw, out, dz = 0, peg = true, flange = true) {
         }
         else translate([-50, -50, -50]) cube(100);
       }
+      // its tab: from the flange (which is under it) to the cap's top
+      if (flange && tabbed(c, sw)) translate([c.x, c.y, ZP - 0.1]) linear_extrude(z_top - ZP + 0.1) tab_2d(rc + 0.6, key_w);
       if (peg) translate([sw.x, sw.y, SW_TOP + press_gap]) cylinder(d = PEG, h = ZP - 0.7 - SW_TOP - press_gap + eps);
     }
     if (LIGHT) for (p = b("leds")) if (norm([p.x, p.y] - [c.x, c.y]) < rc) translate([p.x, p.y, ZP - 2]) cylinder(d = light_d, h = z_top - ZP + 3);
@@ -449,7 +462,7 @@ for (i = [0, 1]) {
     assert(near >= 0.2 || c.y + rf <= r[0] - 0.2 || c.y - rf >= r[1] + 0.2, "a button's flange reaches a rail");
   }
   // the XIAOs: the LED shows through its button, inside its cap (and its flat)
-  if (LIGHT) for (p = b("leds")) if (norm([p.x, p.y] - [c.x, c.y]) < c[2] / 2) assert(norm([p.x, p.y] - [c.x, c.y]) + light_d / 2 <= c[2] / 2 - 0.4 && p.y - c.y + light_d / 2 <= c[2] / 2 - 0.6 - 0.3, "an LED's hole isn't inside its button");
+  if (LIGHT) for (p = b("leds")) if (norm([p.x, p.y] - [c.x, c.y]) < c[2] / 2) assert(norm([p.x, p.y] - [c.x, c.y]) + light_d / 2 <= c[2] / 2 - 0.4 && (flat(c, sw) == undef || p.y - c.y + light_d / 2 <= flat(c, sw) - 0.3), "an LED's hole isn't inside its button");
   if (LIGHT) assert(len([for (p = b("leds")) if (norm([p.x, p.y] - [c.x, c.y]) < c[2] / 2) 1]) == 1, "a button isn't over its LED");
   if (!LIGHT) for (p = b("leds")) assert(norm([p.x, p.y] - [c.x, c.y]) >= rf + led_d / 2 + 0.3, "a button's seat reaches the LED's hole");
 }

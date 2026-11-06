@@ -59,8 +59,9 @@ BUTTON_COLOR = "#f4f4f4";
 // ------------------------------------------------------------------------------------------- boards ---
 // Measured from each maker's own CAD, not guessed:
 //   zero      Waveshare's STEP model (ESP32-S3-Zero_v2): the PCB 18.02 x 23.52 x 1.6, its parts' boxes, the USB-C's
-//             mouth 0.09 .. 3.25 over the top face and 1.22 past the edge. BOOT is left of the LED, RESET right (the
-//             silkscreen's B and R); the switches are 3 x 2.5, 1.6 high with their actuators. Its own drawing: 18 x 23.5
+//             mouth 0.09 .. 3.25 over the top face and 1.22 past the edge. Its switches are 3 x 2.5, 1.6 high with
+//             their actuators, either side of the LED: BOOT right, RESET left (a print on a real board says so: its
+//             pinout picture has them the other way round). Its own drawing: 18 x 23.5
 //   xiao      Seeed's STEP model (XIAO-ESP32S3 v2): 17.78 x 20.95, PCB 1.25; the USB-C's mouth 0 .. 3.21, 1.53 past the
 //             edge. R (RESET) is left of the USB-C and B (BOOT) right, 0.73 high; the two LEDs (charge, and the user
 //             LED) 2.2 below them, from its KiCad (v1.5)
@@ -75,9 +76,9 @@ BOARDS = [
   ["zero", [
     ["size", [18.02, 23.52, 1.6]],
     ["usb", [4.54, 13.48, 0.09, 3.25, 1.22, 7.6]],
-    ["boot", [4.88, 14.85]], ["reset", [13.23, 14.85]], ["sw", [1.6, 1.4]],
+    ["boot", [13.23, 14.85]], ["reset", [4.88, 14.85]], ["sw", [1.6, 1.4]],
     ["leds", [[9.10, 14.83]]],
-    ["boot_cap", [4.5, 14.85, 4.8]], ["reset_cap", [13.23, 14.85, 3.4]],
+    ["boot_cap", [13.55, 14.85, 4.8]], ["reset_cap", [4.88, 14.85, 3.4]],
     ["light", false],
     ["rails", [[1.5, 22.0], [1.5, 22.0]]],
     ["parts", [

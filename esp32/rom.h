@@ -31,7 +31,7 @@ struct Chip {
 };
 
 // Our loader: a program that runs in the ROM's place, where the ROM hands it its USB storage commands, and writes and
-// reads the FM-1's flash (loader/: m-bootloader's, with the FM-1's screen)
+// reads the FM-1's flash (third_party/fm1buddy/loader: m-bootloader's, with the FM-1's screen)
 struct Loader {
   uint32_t at;       // where it links, and is run
   bool plain;        // a plain image (the ROM ciphers it), or as it comes (already ciphered)

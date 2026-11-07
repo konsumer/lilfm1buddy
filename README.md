@@ -120,17 +120,17 @@ doesn't need it; a `mflr-loader.bin` on the drive is used instead, to try a new 
 
 ## The case
 
-Four printed pieces that snap together, no screws, no supports: the shell (the top and the walls, printed top face
-down), the base (it clicks into the shell's open bottom), and the two buttons. BOOT is the big one and stands out a
-little; RESET is flush, so it isn't pressed by accident and needs no paperclip. Each button goes into its hole from
-inside, and a flange under the top keeps it there; one whose peg is off its centre is keyed (a flat, or on the XIAOs a
-tab in a slot through the top), so it can't turn off its switch. The LED shows through the top (on the XIAOs, through
-the buttons, which sit over their LEDs). The base's lips push the board up onto rails under the top with a springy
+Printed pieces that snap together, no screws, no supports: the shell (the top and the walls, printed top face down)
+and the base (it clicks into the shell's open bottom). On the XIAOs the buttons are part of the top: each is a pad on a
+springy arm, cut free by a slot, with a peg under it that presses the switch; BOOT's pad is the big one. Nothing loose
+to line up or turn. On the Zero they're two pieces of their own (print-tested): BOOT is the big one and stands out a
+little; RESET is flush, so it isn't pressed by accident. Each goes into its hole from inside, a flange under the top
+keeps it there, and BOOT has a flat so it can't turn. The LEDs show through the top. The base's lips push the board up onto rails under the top with a springy
 strip, and its ridges pull it up against the walls: nothing rattles. On the XIAOs there's room for a battery under the
 board, and a channel for the antenna's cable.
 
 The page's **Case** tab makes yours in the browser (OpenSCAD in WebAssembly, with a 3D view): pick the board and a
-battery, and download the three STLs. It also says how to print it and put it together. `case/lilfm1buddy-case.scad`
+battery, and download the STLs. It also says how to print it and put it together. `case/lilfm1buddy-case.scad`
 is the model; `tools/cases.sh` writes every board's STLs to `build/cases/`, and `tools/cases.sh --check` runs its fit
 checks (the case against a stand-in for the board, the buttons at rest and pressed, the base, the USB-C plug, the
 battery), which must all pass.

@@ -6,11 +6,12 @@ const OPENSCAD = 'https://cdn.jsdelivr.net/npm/openscad-wasm-prebuilt@1.2.0/dist
 const SCAD = ['fw/lilfm1buddy-case.scad', 'https://raw.githubusercontent.com/konsumer/lilfm1buddy/main/case/lilfm1buddy-case.scad']
 
 // the boards (everything about them, measured from their makers' CAD, is in the .scad's own table). battery: whether
-// it charges one; room: how wide a battery can be under it (the .scad says so too)
+// it charges one; room: how wide a battery can be under it (the .scad says so too); caps: its buttons are a piece of
+// their own (the XIAOs' are part of the shell)
 const BOARDS = [
   { id: 'xiaoplus', name: 'XIAO ESP32S3 Plus', battery: true, room: 14.5 },
   { id: 'xiao', name: 'XIAO ESP32S3', battery: true, room: 14.5 },
-  { id: 'zero', name: 'Waveshare ESP32-S3-Zero', battery: false }
+  { id: 'zero', name: 'Waveshare ESP32-S3-Zero', battery: false, caps: true }
 ]
 // flat LiPos: across, along, thick (the name is thickness, width, length: 401230 is 4 x 12 x 30 mm)
 const BATTERIES = [
@@ -28,7 +29,7 @@ const PIECES = [
   { part: 'view_board', color: 0x26262b, z: 0 },
   { part: 'view_battery', color: 0xb8bcc4, z: -10, battery: true },
   { part: 'view_shell', color: 0xff8a3d, z: 16 },
-  { part: 'view_buttons', color: 0xf4f4f4, z: 16 }
+  { part: 'view_buttons', color: 0xf4f4f4, z: 16, caps: true }
 ]
 
 let openscad, scadText
@@ -243,7 +244,8 @@ export function init() {
       view ||= await viewer(canvas)
       // the files first: if the model refuses (a battery too wide), that's the message
       while (urls.length) URL.revokeObjectURL(urls.pop())
-      for (const part of ['shell', 'base', 'buttons']) {
+      buttons.buttons.hidden = !board().caps
+      for (const part of board().caps ? ['shell', 'base', 'buttons'] : ['shell', 'base']) {
         const stl = await render(defines(part, bat.size))
         const url = URL.createObjectURL(new Blob([stl], { type: 'model/stl' }))
         urls.push(url)
@@ -251,7 +253,7 @@ export function init() {
         buttons[part].download = name(part, bat.size)
       }
       for (const p of PIECES) {
-        const stl = p.battery && !bat.size ? null : await render(defines(p.part, bat.size))
+        const stl = (p.battery && !bat.size) || (p.caps && !board().caps) ? null : await render(defines(p.part, bat.size))
         view.set(p.part, stl, p.color, p.z)
       }
       view.fit()

@@ -50,7 +50,9 @@ for board in zero xiao xiaoplus; do
     [ "$board" = zero ] && [ "$battery" = true ] && continue
     name="lilfm1buddy-case-$board"
     [ "$battery" = true ] && name="$name-battery"
-    for part in shell base buttons; do
+    parts="shell base"
+    [ "$board" = zero ] && parts="$parts buttons" # (the XIAOs' buttons are part of the shell)
+    for part in $parts; do
       run -q -D "board=\"$board\"" -D "battery=$battery" -D "bat=$BAT" -D "part=\"$part\"" --export-format=binstl -o "$out/$name-$part.stl"
     done
     echo "$name"

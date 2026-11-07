@@ -71,9 +71,9 @@ BUTTON_COLOR = "#f4f4f4";
 //             their actuators, either side of the LED: BOOT right, RESET left (a print on a real board says so: its
 //             pinout picture has them the other way round). Its own drawing: 18 x 23.5
 //   xiao      Seeed's STEP model (XIAO-ESP32S3 v2): 17.78 x 20.95, PCB 1.25; the USB-C's mouth 0 .. 3.21, 1.53 past the
-//             edge. R (RESET) is left of the USB-C and B (BOOT) right, 0.73 high; the two LEDs (charge, and the user
+//             edge. B (BOOT) is left of the USB-C and R (RESET) right (a real board says so), 0.73 high; the two LEDs (charge, and the user
 //             LED) 2.2 below them, from its KiCad (v1.5)
-//   xiaoplus  Seeed's KiCad (XIAO ESP32S3 Plus v1.1): Edge.Cuts 17.78 x 21.14, K1 (RESET) and K2 (BOOT), CHG0 and D3
+//   xiaoplus  Seeed's KiCad (XIAO ESP32S3 Plus v1.1): Edge.Cuts 17.78 x 21.14, BOOT left and RESET right (as the XIAO), CHG0 and D3
 //             (the LEDs); its parts' heights are the XIAO's (the same switches, the same USB-C)
 // Each row: [name, value]. size: W, L, PCB. usb: its mouth's x0, x1, z0, z1, how far past the edge, how long it is.
 // boot, reset: the switches' centres; sw: their top, and the peg's diameter. leds: the LEDs' centres. buttons: "flex"
@@ -100,29 +100,29 @@ BOARDS = [
   ["xiao", [
     ["size", [17.78, 20.95, 1.25]],
     ["usb", [4.41, 13.35, 0.0, 3.21, 1.53, 7.3]],
-    ["boot", [14.81, 19.36]], ["reset", [2.96, 19.37]], ["sw", [0.73, 1.4]],
+    ["boot", [2.96, 19.37]], ["reset", [14.81, 19.36]], ["sw", [0.73, 1.4]],
     ["leds", [[2.96, 17.16], [14.86, 17.15]]],
-    ["buttons", "flex"], ["boot_pad", [14.5, 17.5, 6.0]], ["reset_pad", [2.96, 18.5, 4.0]],
-    ["rails", [[1.5, 15.0], [1.5, 13.5]]],
+    ["buttons", "flex"], ["boot_pad", [3.27, 17.5, 6.0]], ["reset_pad", [14.81, 18.5, 4.0]],
+    ["rails", [[1.5, 13.5], [1.5, 15.0]]],
     ["parts", [
       [2.59, 3.64, 15.19, 14.24, 2.0], // the shield
       [2.0, 0.0, 6.4, 3.9, 2.6], // the antenna's socket, with its plug in
-      [2.16, 18.08, 3.76, 20.68, 0.73], [14.01, 18.06, 15.61, 20.66, 0.73] // RESET, BOOT
+      [2.16, 18.08, 3.76, 20.68, 0.73], [14.01, 18.06, 15.61, 20.66, 0.73] // BOOT, RESET
     ]],
     ["ufl", [4.16, 1.72]]
   ]],
   ["xiaoplus", [
     ["size", [17.78, 21.14, 1.25]],
     ["usb", [4.42, 13.36, 0.0, 3.21, 1.50, 7.35]],
-    ["boot", [14.73, 19.48]], ["reset", [3.05, 19.48]], ["sw", [0.73, 1.4]],
+    ["boot", [3.05, 19.48]], ["reset", [14.73, 19.48]], ["sw", [0.73, 1.4]],
     ["leds", [[3.05, 17.27], [14.78, 17.27]]],
-    ["buttons", "flex"], ["boot_pad", [14.45, 17.6, 6.0]], ["reset_pad", [3.05, 18.6, 4.0]],
-    ["rails", [[1.5, 15.0], [1.5, 13.6]]],
+    ["buttons", "flex"], ["boot_pad", [3.33, 17.6, 6.0]], ["reset_pad", [14.73, 18.6, 4.0]],
+    ["rails", [[1.5, 13.6], [1.5, 15.0]]],
     ["parts", [
       [2.6, 3.6, 15.2, 14.3, 2.0], // the ESP32-S3 (as if shielded)
       [7.3, 0.25, 14.8, 3.25, 1.2], // the board-to-board connector
       [2.0, 0.0, 6.4, 3.9, 2.6], // the antenna's socket, with its plug in
-      [2.25, 18.18, 3.85, 20.78, 0.73], [13.93, 18.18, 15.53, 20.78, 0.73] // RESET, BOOT
+      [2.25, 18.18, 3.85, 20.78, 0.73], [13.93, 18.18, 15.53, 20.78, 0.73] // BOOT, RESET
     ]],
     ["ufl", [4.04, 1.73]]
   ]]

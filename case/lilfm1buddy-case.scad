@@ -1,17 +1,19 @@
-// The lilfm1buddy case: snap-fit, no screws, no supports. Four printed pieces:
+// The lilfm1buddy case: snap-fit, no screws, no supports. Printed pieces:
 //
 //   shell    the top and the walls, printed top face down. Rails under the top hold the board's edges down; the
-//            USB-C gets a window with room for a plug's moulding; the LED shows through a hole (the Zero) or through
-//            the buttons (the XIAOs, whose LEDs sit right next to their switches)
+//            USB-C gets a window with room for a plug's moulding; the LEDs show through holes in the top
 //   base     snaps into the shell's open bottom (a ridge on each long side clicks into a groove in the walls, and pulls
 //            the base up against them). Its lips push the board up onto the rails with a springy strip: no rattle
-//   buttons  BOOT (bigger, and it stands out) and RESET (flush: no paperclip, and it isn't pressed by accident). Each
-//            goes into its hole from inside: a flange under the top keeps it there, and a peg presses the switch. One
-//            whose peg is off its centre is keyed, so it can't turn off its switch: a flat (the Zero's BOOT, 0.3 off) or
-//            a tab in a slot through the top (the XIAOs', 1.2 .. 1.8 off: a flat that shallow let them turn)
 //
-//   part     preview (the case closed, with a stand-in for the board), shell, base, buttons (to print), view_* (the
-//            page's pieces), fit_* (the checks: tools/cases.sh --check)
+// The buttons, two ways (each board's "buttons" row):
+//   flex     (the XIAOs) part of the top: each is a pad on a springy arm, cut free by a slot around it, with a peg
+//            under it that presses the switch. Nothing loose, nothing to turn. BOOT's pad is the big one
+//   caps     (the Zero, print-tested) a third piece: BOOT (bigger, and it stands out) and RESET (flush). Each goes into
+//            its hole from inside: a flange under the top keeps it there, and a peg presses the switch. BOOT's peg is
+//            0.3 off its centre, so a flat keeps it from turning. (The XIAOs' caps were 1.2 .. 1.8 off: they turned)
+//
+//   part     preview (the case closed, with a stand-in for the board), shell, base, buttons (caps only; to print),
+//            view_* (the page's pieces), fit_* (the checks: tools/cases.sh --check)
 //   board    zero, xiao, xiaoplus: everything about the board is in its row of BOARDS below
 //   battery  room for a flat LiPo under the board (the XIAOs: they charge it). bat = [width, length, thickness]
 //
@@ -32,7 +34,12 @@ section = false; // preview: cut in half across the buttons, to see the inside
 usb_room = [12.6, 6.8]; // the window: the plug's moulding goes into it (wide, tall)
 
 /* [Buttons] */
-boot_out = 1.2; // how far BOOT stands out of the top (RESET is flush)
+boot_out = 1.2; // caps: how far BOOT stands out of the top (RESET is flush)
+btn_clear = 0.2; // caps: around a cap in its hole
+arm_len = 13; // from a pad's centre to where its arm meets the top (longer is softer)
+arm_w = 2.4;
+arm_t = 0.8; // the arm is thinner than the top (from underneath): it bends, the pad doesn't
+slot = 0.4; // around a pad and its arm, through the top
 
 /* [Fit] */
 wall = 1.6;
@@ -42,17 +49,14 @@ gap = 0.25; // around the board
 fit = 0.15; // between the base's lips and the walls
 snap = 0.5; // how far the base's ridges stand out (into the walls' grooves)
 preload = 0.1; // how hard the ridges pull the base up against the walls
-clear = 1.25; // over the tallest part, to the top's underside: a pressed button's flange still clears it
+clear = 1.25; // over the tallest part, to the top's underside
 under = 3.0; // room under the board without a battery (its pins' solder, the USB-C's legs)
 under_bat = 1.5; // between the board and the battery (the leads)
 lip_t = 1.2;
 spring = 0.35; // how far the lips' bumps press the board up (the strip under them gives up to 0.8)
 press_gap = 0.15; // between a button's peg and its switch, at rest
-btn_clear = 0.2; // around a button in its hole
-key_w = 1.2; // a button's tab (the XIAOs): how wide, and it stands 0.6 out of the cap
-key_clear = 0.15; // either side of the tab, in its slot
-led_d = 1.6; // the LED's hole in the top (the Zero)
-light_d = 1.2; // the LED's hole through a button (the XIAOs)
+led_d = 1.6; // an LED's hole in the top
+light_d = 1.2; // an LED's hole through a button's arm (the XIAOs: their LEDs sit right by their switches)
 
 $fn = 48;
 eps = 0.01;
@@ -72,19 +76,17 @@ BUTTON_COLOR = "#f4f4f4";
 //   xiaoplus  Seeed's KiCad (XIAO ESP32S3 Plus v1.1): Edge.Cuts 17.78 x 21.14, K1 (RESET) and K2 (BOOT), CHG0 and D3
 //             (the LEDs); its parts' heights are the XIAO's (the same switches, the same USB-C)
 // Each row: [name, value]. size: W, L, PCB. usb: its mouth's x0, x1, z0, z1, how far past the edge, how long it is.
-// boot, reset: the switches' centres; sw: their top, and the peg's diameter. leds: the LEDs' centres. caps: each button
-// [x, y, diameter] (the peg is under the switch, the cap may sit beside it). rails: the y range of the rails along the
-// left and right edges (clear of the flanges). parts: boxes [x0, y0, x1, y1, height] to keep out of. ufl: the antenna's
-// socket. light: the LEDs show through the buttons (or through holes of their own). key: how a keyed button is kept
-// from turning, "flat" or "tab".
+// boot, reset: the switches' centres; sw: their top, and the peg's diameter. leds: the LEDs' centres. buttons: "flex"
+// or "caps". pads (flex) or caps: each button [x, y, diameter] (the peg is under the switch, the pad or cap may sit
+// beside it: BOOT's pad is big, and moved in to fit). rails: the y range of the rails along the left and right edges (clear of the pads' slots). parts: boxes
+// [x0, y0, x1, y1, height] to keep out of. ufl: the antenna's socket.
 BOARDS = [
   ["zero", [
     ["size", [18.02, 23.52, 1.6]],
     ["usb", [4.54, 13.48, 0.09, 3.25, 1.22, 7.6]],
     ["boot", [13.23, 14.85]], ["reset", [4.88, 14.85]], ["sw", [1.6, 1.4]],
     ["leds", [[9.10, 14.83]]],
-    ["boot_cap", [13.55, 14.85, 4.8]], ["reset_cap", [4.88, 14.85, 3.4]],
-    ["light", false], ["key", "flat"],
+    ["buttons", "caps"], ["boot_cap", [13.55, 14.85, 4.8]], ["reset_cap", [4.88, 14.85, 3.4]],
     ["rails", [[1.5, 22.0], [1.5, 22.0]]],
     ["parts", [
       [3.95, 2.69, 14.06, 12.80, 1.0], // the ESP32-S3
@@ -98,11 +100,10 @@ BOARDS = [
   ["xiao", [
     ["size", [17.78, 20.95, 1.25]],
     ["usb", [4.41, 13.35, 0.0, 3.21, 1.53, 7.3]],
-    ["boot", [14.81, 19.36]], ["reset", [2.96, 19.37]], ["sw", [0.73, 1.2]],
+    ["boot", [14.81, 19.36]], ["reset", [2.96, 19.37]], ["sw", [0.73, 1.4]],
     ["leds", [[2.96, 17.16], [14.86, 17.15]]],
-    ["boot_cap", [14.45, 17.65, 5.0]], ["reset_cap", [3.0, 18.15, 4.2]],
-    ["light", true], ["key", "tab"],
-    ["rails", [[1.5, 15.0], [1.5, 14.0]]],
+    ["buttons", "flex"], ["boot_pad", [14.5, 17.5, 6.0]], ["reset_pad", [2.96, 18.5, 4.0]],
+    ["rails", [[1.5, 15.0], [1.5, 13.5]]],
     ["parts", [
       [2.59, 3.64, 15.19, 14.24, 2.0], // the shield
       [2.0, 0.0, 6.4, 3.9, 2.6], // the antenna's socket, with its plug in
@@ -113,11 +114,10 @@ BOARDS = [
   ["xiaoplus", [
     ["size", [17.78, 21.14, 1.25]],
     ["usb", [4.42, 13.36, 0.0, 3.21, 1.50, 7.35]],
-    ["boot", [14.73, 19.48]], ["reset", [3.05, 19.48]], ["sw", [0.73, 1.2]],
+    ["boot", [14.73, 19.48]], ["reset", [3.05, 19.48]], ["sw", [0.73, 1.4]],
     ["leds", [[3.05, 17.27], [14.78, 17.27]]],
-    ["boot_cap", [14.45, 17.8, 5.0]], ["reset_cap", [3.05, 18.25, 4.2]],
-    ["light", true], ["key", "tab"],
-    ["rails", [[1.5, 15.0], [1.5, 14.3]]],
+    ["buttons", "flex"], ["boot_pad", [14.45, 17.6, 6.0]], ["reset_pad", [3.05, 18.6, 4.0]],
+    ["rails", [[1.5, 15.0], [1.5, 13.6]]],
     ["parts", [
       [2.6, 3.6, 15.2, 14.3, 2.0], // the ESP32-S3 (as if shielded)
       [7.3, 0.25, 14.8, 3.25, 1.2], // the board-to-board connector
@@ -138,8 +138,9 @@ PCB = b("size")[2];
 USB = b("usb");
 SW_TOP = b("sw")[0];
 PEG = b("sw")[1];
-LIGHT = b("light");
-KEY = b("key");
+FLEX = b("buttons") == "flex";
+PADS = FLEX ? [[b("boot_pad"), b("boot")], [b("reset_pad"), b("reset")]] : []; // each: its pad, its switch
+CAPS = FLEX ? [] : [[b("boot_cap"), b("boot"), boot_out], [b("reset_cap"), b("reset"), 0]]; // and how far it stands out
 UFL = b("ufl");
 
 // ------------------------------------------------------------------------------------------- heights ---
@@ -189,13 +190,35 @@ module ridge(x, y, z, len, d) {
   translate([x, y, z]) rotate([90, 0, 0]) linear_extrude(len, center = true) rotate(45) square(d * sqrt(2), center = true);
 }
 
-// a button's outline: round, or with a flat on its +y side (a cap whose peg or light hole is off its centre must
-// not turn). Or round with a tab on its -y side, 0.6 out: a flat 0.6 deep only met the top's last 0.7 (the seat
-// takes the rest), and the XIAOs' caps turned in it; the tab's slot runs through the whole top
-function keyed(c, sw) = LIGHT || norm([c.x, c.y] - sw) > 0.05;
-function flat(c, sw) = keyed(c, sw) && KEY == "flat" ? c[2] / 2 - 0.6 : undef;
-function tabbed(c, sw) = keyed(c, sw) && KEY == "tab";
-module tab_2d(rt, w) translate([-w / 2, -rt]) square([w, rt]);
+// ----------------------------------------------------------------------------------------- the buttons ---
+// a pad on an arm that runs from it toward the far end (-y), and meets the top at its root. In the top's plane
+function root(c) = c.y - arm_len;
+module flex_2d(c) {
+  translate([c.x, c.y]) circle(d = c[2]);
+  translate([c.x - arm_w / 2, root(c) - 1]) square([arm_w, c.y - root(c) + 1]);
+}
+// the slot that cuts it free: around it, but for its root
+module slot_2d(c) intersection() {
+  difference() {
+    offset(r = slot) flex_2d(c);
+    flex_2d(c);
+  }
+  translate([-50, root(c)]) square(100);
+}
+// what moves when it's pressed: its pad, its arm, its peg (for the checks)
+module flex_column(c) translate([0, 0, ZB]) linear_extrude(ZTOP - ZB + 1) intersection() {
+  flex_2d(c);
+  translate([-50, root(c)]) square(100);
+}
+module pegs() for (p = PADS) translate([p[1].x, p[1].y, SW_TOP + press_gap]) cylinder(d = PEG, h = ZP - SW_TOP - press_gap + eps);
+
+// an LED inside a button's pad or arm (well inside), or well clear of its slot
+function in_flex(p, r, c) = norm([p.x, p.y] - [c.x, c.y]) + r <= c[2] / 2 - 0.4 || (abs(p.x - c.x) + r <= arm_w / 2 - 0.4 && p.y - r >= root(c) && p.y <= c.y);
+function clear_flex(p, r, c) = norm([p.x, p.y] - [c.x, c.y]) >= c[2] / 2 + slot + r + 0.3 && (abs(p.x - c.x) >= arm_w / 2 + slot + r + 0.3 || p.y + r <= root(c) - 0.3 || p.y >= c.y);
+function in_any(p, r) = len([for (q = PADS) if (in_flex(p, r, q[0])) 1]) > 0;
+
+// caps: round, or with a flat on its +y side (a cap whose peg is off its centre must not turn)
+function flat(c, sw) = norm([c.x, c.y] - sw) > 0.05 ? c[2] / 2 - 0.6 : undef;
 module cap_2d(r, flat) {
   if (flat == undef) circle(r);
   else intersection() {
@@ -203,22 +226,19 @@ module cap_2d(r, flat) {
     translate([-r - 1, -r - 1]) square([2 * r + 2, r + 1 + flat]);
   }
 }
-
-// ---------------------------------------------------------------------------------------------- shell ---
 module button_hole(c, sw) {
   rc = c[2] / 2;
   rh = rc + btn_clear;
   rf = rc + 0.8;
   translate([c.x, c.y, 0]) {
     translate([0, 0, ZP - 1]) linear_extrude(plate + 2) cap_2d(rh, flat(c, sw) == undef ? undef : flat(c, sw) + btn_clear);
-    if (tabbed(c, sw)) translate([0, 0, ZP - 1]) linear_extrude(plate + 2) tab_2d(rc + 0.6 + key_clear, key_w + 2 * key_clear);
     // its seat: the flange's cone fits it (running on into the hole, and turned half a facet: so the two don't meet
     // edge on edge)
     translate([0, 0, ZP - eps]) rotate(180 / 48) cylinder(r1 = rf + eps, r2 = rh - 0.3, h = rf - rh + 0.3 + 2 * eps);
   }
 }
 
-module shell() {
+module shell(peg = true) {
   difference() {
     union() {
       difference() {
@@ -236,9 +256,16 @@ module shell() {
     // the USB-C's window, through its wall
     translate([USB_C.x, C1.y - 0.2, USB_C.y]) rotate([-90, 0, 0]) linear_extrude(wall + 1)
       rrect([-USB_WIN.x / 2, -USB_WIN.y / 2], [USB_WIN.x / 2, USB_WIN.y / 2], 1.2);
-    button_hole(b("boot_cap"), b("boot"));
-    button_hole(b("reset_cap"), b("reset"));
-    if (!LIGHT) for (p = b("leds")) translate([p.x, p.y, ZP - 1]) cylinder(d = led_d, h = plate + 2);
+    // the buttons: the slot around each, and its arm thinned from underneath (its pad stays the top's thickness)
+    for (p = PADS) {
+      c = p[0];
+      translate([0, 0, ZP - 1]) linear_extrude(plate + 2) slot_2d(c);
+      // (into the slot, and a little past the root: no faces shared with the slot)
+      translate([c.x - arm_w / 2 - slot / 2, root(c) - 0.3, ZP - 1]) cube([arm_w + slot, c.y - c[2] / 2 - root(c) + 0.3, 1 + plate - arm_t]);
+    }
+    for (p = CAPS) button_hole(p[0], p[1]);
+    // the LEDs: smaller through an arm
+    for (p = b("leds")) translate([p.x, p.y, ZP - 1]) cylinder(d = in_any(p, light_d / 2) ? light_d : led_d, h = plate + 2);
     // the grooves the base's ridges click into, and a lead-in at the walls' bottom edge
     // (0.1 into the wall, and 0.1 down to keep the same pull: its corners mustn't sit on the wall's face)
     for (x = [C0.x - 0.1, C1.x + 0.1]) ridge(x, RIDGE_Y, Z_GROOVE - 0.1, RIDGE_LEN, GROOVE);
@@ -254,6 +281,7 @@ module shell() {
       else translate([UFL.x - 2.5, C0.y - 1.0, ZF - 1]) cube([5, 1.0 + eps, ZP - ZF + 1]);
     }
   }
+  if (peg) pegs();
 }
 
 // ----------------------------------------------------------------------------------------------- base ---
@@ -293,49 +321,38 @@ module base(bump = true) {
   }
 }
 
-// --------------------------------------------------------------------------------------------- buttons ---
+// ------------------------------------------------------------------------------------------- caps ---
 // in the case's frame, at rest: its flange 0.1 under its seat, its peg press_gap over its switch. dz: pressed down
 module button(c, sw, out, dz = 0, peg = true, flange = true) {
   rc = c[2] / 2;
   rf = rc + 0.8;
   flat = flat(c, sw);
   z_top = ZTOP + out;
-  translate([0, 0, -dz]) difference() {
-    union() {
-      if (flange) translate([c.x, c.y, 0]) intersection() {
-        union() {
-          translate([0, 0, ZP - 0.1]) cylinder(r1 = rf, r2 = rc - 0.3, h = rf - rc + 0.3);
-          translate([0, 0, ZP - 0.1]) cylinder(r = rc, h = z_top - ZP + 0.1);
-          translate([0, 0, ZP - 0.7]) cylinder(r = rf, h = 0.6 + eps);
-        }
-        // a keyed cap's flat, through the hole; under it, where the seat is round, a 45 degree face down to the
-        // flange's edge (printed cap down, a flat cut there would leave the flange's rim hanging in the air)
-        if (flat != undef) union() {
-          translate([0, 0, ZP - 1]) linear_extrude(z_top - ZP + 2) cap_2d(rf, flat);
-          translate([0, flat, ZP + 0.6]) rotate([45, 0, 0]) translate([-50, -100, -50]) cube(100);
-        }
-        else translate([-50, -50, -50]) cube(100);
+  translate([0, 0, -dz]) union() {
+    if (flange) translate([c.x, c.y, 0]) intersection() {
+      union() {
+        translate([0, 0, ZP - 0.1]) cylinder(r1 = rf, r2 = rc - 0.3, h = rf - rc + 0.3);
+        translate([0, 0, ZP - 0.1]) cylinder(r = rc, h = z_top - ZP + 0.1);
+        translate([0, 0, ZP - 0.7]) cylinder(r = rf, h = 0.6 + eps);
       }
-      // its tab: from the flange (which is under it) to the cap's top
-      if (flange && tabbed(c, sw)) translate([c.x, c.y, ZP - 0.1]) linear_extrude(z_top - ZP + 0.1) tab_2d(rc + 0.6, key_w);
-      if (peg) translate([sw.x, sw.y, SW_TOP + press_gap]) cylinder(d = PEG, h = ZP - 0.7 - SW_TOP - press_gap + eps);
+      // a keyed cap's flat, through the hole; under it, where the seat is round, a 45 degree face down to the
+      // flange's edge (printed cap down, a flat cut there would leave the flange's rim hanging in the air)
+      if (flat != undef) union() {
+        translate([0, 0, ZP - 1]) linear_extrude(z_top - ZP + 2) cap_2d(rf, flat);
+        translate([0, flat, ZP + 0.6]) rotate([45, 0, 0]) translate([-50, -100, -50]) cube(100);
+      }
+      else translate([-50, -50, -50]) cube(100);
     }
-    if (LIGHT) for (p = b("leds")) if (norm([p.x, p.y] - [c.x, c.y]) < rc) translate([p.x, p.y, ZP - 2]) cylinder(d = light_d, h = z_top - ZP + 3);
+    if (peg) translate([sw.x, sw.y, SW_TOP + press_gap]) cylinder(d = PEG, h = ZP - 0.7 - SW_TOP - press_gap + eps);
   }
 }
 
-module buttons(dz = 0, peg = true, flange = true) {
-  button(b("boot_cap"), b("boot"), boot_out, dz, peg, flange);
-  button(b("reset_cap"), b("reset"), 0, dz, peg, flange);
-}
+module buttons(dz = 0, peg = true, flange = true) for (p = CAPS) button(p[0], p[1], p[2], dz, peg, flange);
 
 // to print: each cap down on the bed
-module buttons_print() {
-  for (i = [0, 1]) {
-    c = i == 0 ? b("boot_cap") : b("reset_cap");
-    out = i == 0 ? boot_out : 0;
-    translate([i * 10, 0, ZTOP + out]) mirror([0, 0, 1]) translate([-c.x, -c.y, 0]) button(c, i == 0 ? b("boot") : b("reset"), out);
-  }
+module buttons_print() for (i = [0 : len(CAPS) - 1]) {
+  p = CAPS[i];
+  translate([i * 10, 0, ZTOP + p[2]]) mirror([0, 0, 1]) translate([-p[0].x, -p[0].y, 0]) button(p[0], p[1], p[2]);
 }
 
 // ------------------------------------------------------------------------------------- the stand-ins ---
@@ -382,7 +399,7 @@ module cut() {
 cut() {
   if (part == "shell") translate([0, 0, ZTOP]) mirror([0, 0, 1]) shell();
   if (part == "base") translate([0, 0, -ZFB]) base();
-  if (part == "buttons") buttons_print();
+  if (part == "buttons" && !FLEX) buttons_print();
   if (part == "preview") {
     color(SHELL_COLOR) shell();
     color(BASE_COLOR) base();
@@ -405,19 +422,28 @@ cut() {
     }
     board_in(0.02);
   }
-  if (part == "fit_buttons") intersection() {  // the buttons in their holes, at rest and pressed all the way
+  if (part == "fit_buttons") intersection() {  // caps: in their holes, at rest and pressed all the way
     shell();
     union() {
       buttons();
       buttons(press_gap + 0.3);
     }
   }
-  if (part == "fit_press") intersection() {  // a button pressed all the way: its flange clears the board's parts
-    buttons(press_gap + 0.3, peg = false);
+  if (part == "fit_press") intersection() {  // the buttons pressed all the way: the pads, arms, and caps' flanges
+    union() {                                // clear the board
+      translate([0, 0, -(press_gap + 0.3)]) intersection() {
+        shell(peg = false);
+        for (p = PADS) flex_column(p[0]);
+      }
+      buttons(press_gap + 0.3, peg = false);
+    }
     board_in(0.02);
   }
   if (part == "fit_reach") intersection() {  // a little past press_gap, each peg is on its switch
-    buttons(press_gap + 0.05, flange = false);
+    union() {
+      translate([0, 0, -(press_gap + 0.05)]) pegs();
+      buttons(press_gap + 0.05, flange = false);
+    }
     switches_in();
   }
   if (part == "fit_base") intersection() {  // the base in the shell (but its ridges, which are meant to press, and
@@ -448,9 +474,30 @@ assert(!battery || (bat.y > 0 && bat.z > 0), "the battery needs a length and a t
 assert(USB_C.y + USB_WIN.y / 2 <= ZTOP - 0.8, "the USB-C's window reaches the top");
 assert(USB_C.y - USB_WIN.y / 2 >= ZF + 0.8, "the USB-C's window reaches the floor");
 assert(USB_WIN.x <= C1.x - C0.x - 2, "the USB-C's window is wider than the case");
-for (i = [0, 1]) {
-  c = i == 0 ? b("boot_cap") : b("reset_cap");
-  sw = i == 0 ? b("boot") : b("reset");
+for (p = PADS) {
+  c = p[0];
+  sw = p[1];
+  ro = c[2] / 2 + slot; // the slot's outer edge, around the pad
+  ao = arm_w / 2 + slot; // and along the arm
+  // in the cavity, clear of the rails, its root on the top, and its peg under its pad
+  assert(c.x - ro >= C0.x + 0.1 && c.x + ro <= C1.x - 0.1 && c.y + ro <= C1.y - 0.1, "a button's pad reaches the walls");
+  assert(root(c) >= C0.y + 0.5, "a button's arm is longer than the case");
+  assert(norm([c.x, c.y] - sw) + PEG / 2 <= c[2] / 2 - 0.3, "a button's peg isn't under its pad");
+  for (s = [0, 1]) {
+    r = b("rails")[s];
+    rx = s == 0 ? 1.0 : W - 1.0;
+    near_pad = s == 0 ? c.x - ro - rx : rx - (c.x + ro);
+    near_arm = s == 0 ? c.x - ao - rx : rx - (c.x + ao);
+    assert(near_pad >= 0.2 || c.y + ro <= r[0] - 0.2 || c.y - ro >= r[1] + 0.2, "a button's pad reaches a rail");
+    assert(near_arm >= 0.2 || c.y <= r[0] - 0.2 || root(c) >= r[1] + 0.2, "a button's arm reaches a rail");
+  }
+  // each LED: through a pad or an arm, or clear of them
+  for (l = b("leds")) assert(in_flex(l, light_d / 2, c) || clear_flex(l, led_d / 2, c), "an LED's hole cuts a button's slot");
+}
+if (FLEX) assert(norm([b("boot_pad").x, b("boot_pad").y] - [b("reset_pad").x, b("reset_pad").y]) >= b("boot_pad")[2] / 2 + b("reset_pad")[2] / 2 + 2 * slot + 1.0 && abs(b("boot_pad").x - b("reset_pad").x) >= arm_w + 2 * slot + 1.0, "the buttons' slots meet");
+for (p = CAPS) {
+  c = p[0];
+  sw = p[1];
   rf = c[2] / 2 + 0.8;
   // its seat and flange inside the cavity, clear of the rails, and over its peg
   assert(c.x - rf >= C0.x + 0.1 && c.x + rf <= C1.x - 0.1 && c.y - rf >= C0.y + 0.1 && c.y + rf <= C1.y - 0.1, "a button's flange reaches the walls");
@@ -461,9 +508,6 @@ for (i = [0, 1]) {
     near = s == 0 ? c.x - rf - rx : rx - (c.x + rf);
     assert(near >= 0.2 || c.y + rf <= r[0] - 0.2 || c.y - rf >= r[1] + 0.2, "a button's flange reaches a rail");
   }
-  // the XIAOs: the LED shows through its button, inside its cap (and its flat)
-  if (LIGHT) for (p = b("leds")) if (norm([p.x, p.y] - [c.x, c.y]) < c[2] / 2) assert(norm([p.x, p.y] - [c.x, c.y]) + light_d / 2 <= c[2] / 2 - 0.4 && (flat(c, sw) == undef || p.y - c.y + light_d / 2 <= flat(c, sw) - 0.3), "an LED's hole isn't inside its button");
-  if (LIGHT) assert(len([for (p = b("leds")) if (norm([p.x, p.y] - [c.x, c.y]) < c[2] / 2) 1]) == 1, "a button isn't over its LED");
-  if (!LIGHT) for (p = b("leds")) assert(norm([p.x, p.y] - [c.x, c.y]) >= rf + led_d / 2 + 0.3, "a button's seat reaches the LED's hole");
+  for (l = b("leds")) assert(norm([l.x, l.y] - [c.x, c.y]) >= rf + led_d / 2 + 0.3, "a button's seat reaches the LED's hole");
 }
-assert(norm([b("boot_cap").x, b("boot_cap").y] - [b("reset_cap").x, b("reset_cap").y]) >= b("boot_cap")[2] / 2 + b("reset_cap")[2] / 2 + 1.6 + 0.6, "the buttons' flanges meet");
+if (!FLEX) assert(norm([b("boot_cap").x, b("boot_cap").y] - [b("reset_cap").x, b("reset_cap").y]) >= b("boot_cap")[2] / 2 + b("reset_cap")[2] / 2 + 1.6 + 0.6, "the buttons' flanges meet");

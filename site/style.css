@@ -370,6 +370,7 @@ h2 a {
 }
 
 .maker-custom[hidden],
-.maker-switch[hidden] {
+.maker-switch[hidden],
+.maker-download[hidden] {
   display: none;
 }

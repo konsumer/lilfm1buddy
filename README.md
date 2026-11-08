@@ -48,6 +48,8 @@ and macOS is told not to make most of them. On the drive:
 - `midimap.txt`: MIDI routing on the FM-1, with [fm1buddy](https://github.com/konsumer/fm1buddy)'s rules (none: no
   routing): make one on [fm1buddy's MIDI map page](https://konsumer.js.org/fm1buddy/#midimap). A line `bluetooth` turns on Bluetooth MIDI (phones and computers connect to it, as `fm1buddy`), and
   `bluetooth NAME` connects to a Bluetooth MIDI device whose name has NAME in it
+  Two of the same device on the hub get their hub port's letter after the name (port 1 is A), as on fm1buddy: `to
+"fm-1 b"` reaches just that one, `to fm-1` both
 - `log.txt`: what happened last time on the FM-1
 
 On the FM-1:

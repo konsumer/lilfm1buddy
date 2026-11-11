@@ -1,4 +1,4 @@
-# Builds the menus (JieLi's toolchain) and the board's program for each board (xiaoplus, xiao, zero, devkit). On main,
+# Builds the menus (JieLi's toolchain) and the board's program for each board (xiaoplus, xiao, zero, supermini, devkit). On main,
 # the web page (site/) goes to GitHub Pages with the program next to it (site/fw/). Settings -> Pages -> Source: GitHub
 # Actions.
 name: build
@@ -54,7 +54,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install platformio
-      - run: pio run -e xiaoplus -e xiao -e zero -e devkit
+      - run: pio run -e xiaoplus -e xiao -e zero -e supermini -e devkit
       - name: the page, with the program and the menus
         run: tools/site.sh
       - uses: actions/upload-artifact@v4

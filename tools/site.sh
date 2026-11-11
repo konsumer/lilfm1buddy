@@ -7,7 +7,7 @@ version="$(git describe --tags --always --dirty)"
 mkdir -p site/fw
 cp build/lilfm1.bin build/lilsmk.bin site/fw/
 cp case/lilfm1buddy-case.scad site/fw/  # (the page's case maker runs it in the browser)
-for b in xiaoplus xiao zero devkit; do
+for b in xiaoplus xiao zero supermini devkit; do
   [ -f .pio/build/$b/firmware.factory.bin ] || continue
   mkdir -p site/fw/$b
   cp .pio/build/$b/firmware.factory.bin site/fw/$b/lilfm1buddy.bin

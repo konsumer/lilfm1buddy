@@ -147,7 +147,7 @@ again), and any of its commands (`info`, `ls`, `log`, `read OFF LEN NAME`, `rm N
 `~/.platformio/penv/bin/python tools/lil.py flash zero`.
 
 Other ESP32-S3 boards with PSRAM build too (`platformio.ini`: `xiao`, the XIAO ESP32S3, 8 MB; `zero`, the Waveshare
-ESP32-S3-Zero, 4 MB, RGB LED; `devkit`, any N16R8), with `pio run -e NAME -t upload`. The drive is the flash past the
+ESP32-S3-Zero, 4 MB, RGB LED; `supermini`, the ESP32-S3 Super Mini, 4 MB, RGB LED (no case); `devkit`, any N16R8), with `pio run -e NAME -t upload`. The drive is the flash past the
 program: about 3 MB on a 4 MB board (5 firmwares, or 3 backups), 7 MB on 8 MB, 15 MB on 16 MB. CI
 (`.github/workflows/build.yml`) builds them all, and on `main` puts the page on GitHub Pages with the program next to
 it.

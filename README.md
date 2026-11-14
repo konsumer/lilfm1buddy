@@ -173,3 +173,5 @@ it.
 - [fm1buddy](https://github.com/konsumer/fm1buddy): the ESP32 side.
 
 The rest is [GPL-3.0](LICENSE), like fm1buddy.
+
+Related: try FM-1 firmwares in the browser with the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/).

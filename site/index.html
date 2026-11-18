@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>lilfm1buddy</title>
     <meta name="description" content="Switch the M-VAVE FM-1's firmware from the FM-1 itself, with a tiny ESP32-S3 on its USB port." />
-    <link rel="stylesheet" href="style.css?v=16" />
+    <link rel="stylesheet" href="style.css?v=17" />
     <!-- the case's 3D view and its OpenSCAD, for the Case tab (casemaker.js) -->
     <script type="importmap">
       {
@@ -39,6 +39,7 @@
       <a href="#" data-tab="install">Install</a>
       <a href="#drive" data-tab="drive">Drive</a>
       <a href="#use" data-tab="use">Use it</a>
+      <a href="#try" data-tab="try">Try it</a>
       <a href="#case" data-tab="case">Case</a>
     </nav>
 
@@ -185,13 +186,53 @@
         </section>
       </div>
 
+      <div data-page="try" hidden>
+        <section class="panel">
+          <p>The menu on the FM-1's screen, here: the same program, with a pretend board and its drive. Nothing is sent anywhere.</p>
+          <div class="emu">
+            <canvas id="emu-screen" width="240" height="240" aria-label="the FM-1's screen"></canvas>
+            <div class="emu-panel">
+              <div class="emu-row">
+                <button type="button" class="emu-knob" id="emu-sel" aria-label="SEL knob: drag, scroll, or the arrow keys"><span></span></button>
+                <div class="emu-col">
+                  <span class="emu-label">SEL</span>
+                  <div class="emu-row">
+                    <button type="button" class="emu-btn small" data-step="-1" aria-label="SEL left">&#9664;</button>
+                    <button type="button" class="emu-btn small" data-step="1" aria-label="SEL right">&#9654;</button>
+                  </div>
+                </div>
+              </div>
+              <div class="emu-row">
+                <button type="button" class="emu-btn" data-btn="0">OCT-</button>
+                <button type="button" class="emu-btn" data-btn="1">OCT+</button>
+              </div>
+              <div class="emu-row">
+                <button type="button" class="emu-btn" data-btn="8">HOME</button>
+                <button type="button" class="emu-btn" data-btn="9">SAVE</button>
+                <button type="button" class="emu-btn" data-btn="7">GLO</button>
+              </div>
+              <div class="emu-row">
+                <button type="button" class="emu-btn" data-btn="6">EDIT</button>
+                <button type="button" class="emu-btn" data-btn="13">REC</button>
+              </div>
+              <div class="emu-keys" aria-label="piano keys"><button type="button" data-note="0">1</button><button type="button" data-note="1">2</button><button type="button" data-note="2">3</button><button type="button" data-note="3">4</button><button type="button" data-note="4">5</button><button type="button" data-note="5">6</button><button type="button" data-note="6">7</button><button type="button" data-note="7">8</button></div>
+              <div class="emu-row">
+                <button type="button" class="emu-btn boot" id="emu-boot">BOOT</button>
+                <span class="emu-label">the board's</span>
+              </div>
+            </div>
+          </div>
+          <p class="note">Keys: arrows turn SEL, <kbd>Enter</kbd> OCT+, <kbd>Backspace</kbd> OCT-, <kbd>H</kbd> HOME, <kbd>S</kbd> SAVE, <kbd>G</kbd> GLO, <kbd>E</kbd> EDIT, <kbd>R</kbd> REC, <kbd>1</kbd>-<kbd>8</kbd> piano keys, <kbd>B</kbd> BOOT. The buttons that do something glow, as they do on the FM-1.</p>
+        </section>
+      </div>
+
       <div data-page="use" hidden>
         <section class="panel">
           <ol>
             <li>Plug the board into the FM-1 (switched on) with a USB-C data cable, or into a powered hub with the FM-1 and other MIDI devices on it. Its LED goes green.</li>
-            <li>With a <code>midimap.txt</code> on its drive, it routes MIDI between them (make one on <a href="https://konsumer.js.org/fm1buddy/#midimap">fm1buddy's MIDI map page</a>; a line <code>bluetooth</code> adds Bluetooth MIDI). Without one, it waits.</li>
-            <li><strong>Press BOOT</strong> for the menu on the FM-1's screen. With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With any other (SLOOP, ...), or none, the LED says <em>switch it off, then on</em>: do (the FM-1 straight on the board for this, no hub).</li>
-            <li>The FM-1 shows the list: <em>Back up this FM-1</em>, then the firmwares and backups. Turn SEL to move, press OCT+ to pick, and OCT+ again to be sure (anything else goes back).</li>
+            <li>With a <code>midimap.txt</code> on its drive, it routes MIDI between them (make one on <a href="https://konsumer.js.org/fm1buddy/#midimap">fm1buddy's MIDI map page</a>; a line <code>bluetooth</code> adds Bluetooth MIDI). Without one, the menu comes up on the FM-1's screen by itself, if its firmware lets it (stock V15, Felucca-based ones).</li>
+            <li>Or <strong>press BOOT</strong> for the menu. With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With any other (SLOOP, ...), or none, the LED says <em>switch it off, then on</em>: do (the FM-1 straight on the board for this, no hub).</li>
+            <li>The menu has a page on each of three buttons (they glow, with the others that do something): <strong>HOME</strong>, the firmwares; <strong>SAVE</strong>, backing up and the backups; <strong>GLO</strong>, the theme and what the board and the FM-1's chip are. Turn SEL to move (or press a piano key: its row), OCT+ to install or restore, and OCT+ again to be sure (anything else goes back). EDIT shows a file's details, REC deletes it.</li>
             <li>The board writes it (or backs it up to <code>fm1-N.bin</code>) and the FM-1 shows its flash as it goes; then the FM-1 starts its new firmware, and the board restarts too, ready for the next one.</li>
           </ol>
           <h2>The LED</h2>
@@ -246,5 +287,6 @@
       </div>
     </main>
     <script type="module" src="app.js?v=15"></script>
+    <script type="module" src="emu.js?v=1"></script>
   </body>
 </html>

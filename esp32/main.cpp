@@ -18,7 +18,9 @@
 // mode (hold BOOT, tap reset), which nothing here can break.
 //
 // The FM-1, straight or on a powered hub with other MIDI devices: their USB host. With a midimap.txt it routes MIDI
-// between them (and Bluetooth). Press BOOT (it wakes it too) for the menu:
+// between them (and Bluetooth). Press BOOT (it wakes it too) for the menu. With no midimap.txt there's nothing else
+// for it to do, so the menu comes up by itself when it's plugged in, if the FM-1's firmware takes the SysEx below (not
+// after a job, though: the FM-1 has just started what was installed):
 //
 //   1. the FM-1 into its boot ROM: SysEx to its firmware (stock V15, Felucca-based ones). If that doesn't work, the
 //      board restarts into key mode (fm1buddy's key_s3.cpp), and the key does it as the FM-1 is switched on. The key
@@ -35,11 +37,13 @@
 // each SysEx: F0 7D 4C 42 TEXT F7, answered the same way): the menu's, and any FM-1 firmware's that wants them. Each
 // answer ends with a line "OK" or "ERR why":
 //
-//   info               lilfm1buddy VERSION free=BYTES loader=0|1 battery=BARS (0..3, -1: it can't tell), and
+//   info               lilfm1buddy VERSION free=BYTES loader=0|1 battery=BARS (0..3, -1: none, or it can't tell), and
 //                      theme=NAME with a theme.txt
 //   ls                 NAME BYTES KIND, a line for each file on the drive (names up to 60 characters). KIND: what
 //                      it's for, fm1 or smk (a firmware, a backup), or - (anything else)
 //   read OFF LEN NAME  LEN bytes (up to 64) of a file from OFF, in hex
+//   about NAME         size=BYTES kind=KIND, and product=ID (a package's: FM-1_974) and date=YYYY-MM-DD if it has them
+//   theme NAME         theme.txt says NAME (the menu's settings)
 //   rm NAME            the file gone
 //   install NAME       (from the FM-1) that firmware or backup onto it; OK first, then it's done
 //   backup             (from the FM-1) its whole flash to fm1-N.bin (smk-N.bin: an SMK-37's); OK first
@@ -61,9 +65,9 @@
 
 #include "board.h"
 #include "fm1.h"
-#include "mflr_loader.h"
 #include "hal.h"
 #include "lil.h"
+#include "mflr_loader.h"
 #include "midi.h"
 #include "rom.h"
 
@@ -79,10 +83,13 @@
 #define SMK_MARK 0xC1224u
 #define IDLE_MS 120000  // nothing to do for this long: sleep
 #define MENU_MS 600000  // (with the menu up: nothing picked)
-#define VERSION "0.4.3"
+#define VERSION "0.5.0"
 
 #define SERIAL_MODE 0x53455249
 static RTC_NOINIT_ATTR uint32_t serialFlag;  // a restart into the serial port (the drive ejected)
+#define JOB_DONE 0x4A4F4244
+static RTC_NOINIT_ATTR uint32_t jobFlag;  // a restart after a job: the FM-1 is starting its firmware, so no menu by itself
+static bool afterJob;
 static bool computer, serial, fsOk;
 // which it is, an FM-1 or an SMK-37, as its firmware said (fm1.cpp's handshake), or as the menu that's on the drive
 // says; kept through key mode's restart
@@ -133,7 +140,6 @@ static void mapStart() {
   screenOn = false;
 }
 
-
 // the loader's screen, as the job goes: the percentage on its first row, the sectors under it
 static void mapShow(const char* what, uint32_t done, uint32_t total) {
   if (!screenOn) {
@@ -170,7 +176,7 @@ static void sleepNow(uint32_t ms = 10000) {
   esp_deep_sleep_start();
 }
 
-// its own battery, in bars (0..3), or -1 if it can't tell (BAT_ADC: the pin that reads it, through BAT_DIV)
+// its own battery, in bars (0..3), or -1 if there is none or it can't tell (BAT_ADC: the pin that reads it, through BAT_DIV)
 static int batteryBars() {
 #ifdef BAT_ADC
   uint32_t v = 0;
@@ -179,6 +185,9 @@ static int batteryBars() {
   }
   v = v / 8 * BAT_DIV;
   say("Its battery: %u mV", (unsigned)v);
+  if (v < 2500) {
+    return -1;  // none: the pin reads ~0 with no battery on the pads (a LiPo's own cut-off is above this)
+  }
   return v >= 3900 ? 3 : v >= 3700 ? 2
                      : v >= 3500   ? 1
                                    : 0;
@@ -204,8 +213,9 @@ static int find(uint32_t ms) {
   return -1;
 }
 
-// the FM-1 into its boot ROM: 0 there, or an error (after it's restarted into key mode: never returns then)
-static const char* toRom() {
+// the FM-1 into its boot ROM: 0 there, or an error. If its firmware doesn't take the SysEx and the menu was asked for
+// (BOOT), it restarts into key mode (never returns then); if it came up by itself, it's left as it is
+static const char* toRom(bool asked) {
   if (hal::recoveryMode()) {
     led(LED_SWITCH);
     say("Switch the FM-1 OFF, then ON");
@@ -232,7 +242,7 @@ static const char* toRom() {
   if (d >= 0 && !(e = rom::enter(d))) {
     e = rom::attach(10000);
   }
-  if (e) {  // (SLOOP, say: it doesn't take the SysEx) the key, from key mode
+  if (e && asked) {  // (SLOOP, say: it doesn't take the SysEx) the key, from key mode
     say("%s Into key mode.", e);
     hal::recoveryModeSet(true);
   }
@@ -627,6 +637,38 @@ static void command(const char* line, int dev) {
       sprintf(hex + i * 2, "%02x", b[i]);
     }
     reply("%s", hex);
+  } else if (!strcmp(cmd, "about")) {
+    struct stat st;
+    if (!exists(arg) || stat((FS "/" + std::string(arg)).c_str(), &st)) {
+      reply("ERR No such file.");
+      return;
+    }
+    char product[24] = "", date[24] = "";
+    if (FILE* f = endsWith(arg, ".fwsc") ? fopen((FS "/" + std::string(arg)).c_str(), "rb") : 0) {
+      static uint8_t head[64 * 0x30];
+      uint32_t blocks;
+      char p[20];
+      if (pkgHead(head, fread(head, 1, sizeof head, f), p, sizeof p, blocks)) {
+        snprintf(product, sizeof product, " product=%s", p);
+      }
+      fclose(f);
+    }
+    struct tm tm;
+    if (st.st_mtime > 946684800 && gmtime_r(&st.st_mtime, &tm)) {  // (after 2000: a computer's clock set it)
+      snprintf(date, sizeof date, " date=%04d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+    }
+    reply("size=%u kind=%s%s%s", (unsigned)st.st_size, KINDS[kindOf(arg)], product, date);
+  } else if (!strcmp(cmd, "theme")) {
+    size_t n = strlen(arg);
+    FILE* f = n && n < 16 && strspn(arg, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") == n
+                  ? fopen(FS "/theme.txt", "w")
+                  : 0;
+    if (!f) {
+      reply("ERR That isn't a theme's name.");
+      return;
+    }
+    fprintf(f, "%s\n", arg);
+    fclose(f);
   } else if (!strcmp(cmd, "rm")) {
     if (!exists(arg) || remove((FS "/" + std::string(arg)).c_str())) {
       reply("ERR No such file.");
@@ -664,8 +706,8 @@ static void command(const char* line, int dev) {
 }
 
 // ---- on the FM-1 ----
-// the menu on it: 0, or an error
-static const char* startMenu() {
+// the menu on it (asked: BOOT was pressed, else it's coming up by itself): 0, or an error
+static const char* startMenu(bool asked) {
   midi::route(false);
   // who it is first, before anything's done to it: the menu for that device has to be on the drive, or nothing is sent
   // (it stays as it is, its screen too, and the LED says what's missing: a menu that isn't there can't draw it)
@@ -690,7 +732,7 @@ static const char* startMenu() {
              kind == KIND_SMK ? "an SMK-37" : "an FM-1");
     return e;  // (nothing's been done to it: its firmware and screen are as they were)
   }
-  const char* e = toRom();
+  const char* e = toRom(asked);
   if (!e && !(e = runProgram(menu))) {
     led(LED_PICK);
     say("The menu's on the FM-1.");
@@ -705,6 +747,7 @@ static void restart() {
     logSave();
   }
   say("Restarting.");
+  jobFlag = JOB_DONE;
   delay(500);  // (its firmware is coming up: let it)
   esp_restart();
 }
@@ -755,9 +798,17 @@ static void host(void*) {
   bool menu = hal::recoveryMode() || esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0;
   bool routes = !menu && routing();
   const char* e;
-  if (menu && (e = startMenu())) {
+  if (menu && (e = startMenu(true))) {
     fail(e);
     sleepNow();
+  }
+  if (!menu && !routes && !afterJob && fsOk) {  // (nothing else to do: the menu by itself, if its firmware takes it)
+    if ((e = startMenu(false))) {
+      say("%s No menu by itself: BOOT for it.", e);
+      kind = KIND_NONE;  // (asked again, when BOOT is pressed)
+    } else {
+      menu = true;
+    }
   }
   if (!menu) {
     led(routes ? LED_ROUTING : LED_READY);
@@ -767,7 +818,7 @@ static void host(void*) {
   for (;;) {
     delay(10);
     if (!menu && bootPressed()) {
-      if ((e = startMenu())) {
+      if ((e = startMenu(true))) {
         fail(e);
         sleepNow();
       }
@@ -813,6 +864,8 @@ void setup() {
   }
   serial = computer && serialFlag == SERIAL_MODE && esp_reset_reason() == ESP_RST_SW;
   serialFlag = 0;
+  afterJob = jobFlag == JOB_DONE && esp_reset_reason() == ESP_RST_SW;
+  jobFlag = 0;
   if (serial) {
     led(LED_SERIAL);
     fsOk = disk::mount();  // (the computer hasn't it now)

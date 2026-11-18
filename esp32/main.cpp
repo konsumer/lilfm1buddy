@@ -37,7 +37,7 @@
 // each SysEx: F0 7D 4C 42 TEXT F7, answered the same way): the menu's, and any FM-1 firmware's that wants them. Each
 // answer ends with a line "OK" or "ERR why":
 //
-//   info               lilfm1buddy VERSION free=BYTES loader=0|1 battery=BARS (0..3, -1: it can't tell), and
+//   info               lilfm1buddy VERSION free=BYTES loader=0|1 battery=BARS (0..3, -1: none, or it can't tell), and
 //                      theme=NAME with a theme.txt
 //   ls                 NAME BYTES KIND, a line for each file on the drive (names up to 60 characters). KIND: what
 //                      it's for, fm1 or smk (a firmware, a backup), or - (anything else)
@@ -176,7 +176,7 @@ static void sleepNow(uint32_t ms = 10000) {
   esp_deep_sleep_start();
 }
 
-// its own battery, in bars (0..3), or -1 if it can't tell (BAT_ADC: the pin that reads it, through BAT_DIV)
+// its own battery, in bars (0..3), or -1 if there is none or it can't tell (BAT_ADC: the pin that reads it, through BAT_DIV)
 static int batteryBars() {
 #ifdef BAT_ADC
   uint32_t v = 0;
@@ -185,6 +185,9 @@ static int batteryBars() {
   }
   v = v / 8 * BAT_DIV;
   say("Its battery: %u mV", (unsigned)v);
+  if (v < 2500) {
+    return -1;  // none: the pin reads ~0 with no battery on the pads (a LiPo's own cut-off is above this)
+  }
   return v >= 3900 ? 3 : v >= 3700 ? 2
                      : v >= 3500   ? 1
                                    : 0;

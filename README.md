@@ -56,13 +56,19 @@ On the FM-1:
 
 1. Plug the board into the FM-1, switched on (or a powered hub, with the FM-1 and other MIDI devices). The LED goes
    green: dim, or bright while it routes MIDI (`midimap.txt`), flashing as it goes through.
-2. Press BOOT. With stock V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by
-   itself. With any other (SLOOP, ...), or none, the LED blinks yellow: switch the FM-1 off, then on (straight on the
-   board for this: no hub).
-3. The FM-1 shows the list, and both batteries at the top: "Back up this FM-1", then its firmwares and backups. Turn
-   SEL to move, press OCT+ to pick, and OCT+ again to be sure (anything else: back). OCT- is INFO: what its chip is
-   (its flash and its key, like M-Flasher's page says), the loader, the drive's room, the board's version. The buttons
-   that do something glow dimly. To keep what's on it, switch the FM-1 off and on.
+2. Without a `midimap.txt`, there's nothing else for it to do: the menu comes up on the FM-1 by itself, if its
+   firmware lets it (stock V15, Felucca-based ones), but not right after it installed one. Or press BOOT. With stock
+   V15 or a Felucca-based firmware running, the board sends the FM-1 into its boot loader by itself. With any other
+   (SLOOP, ...), or none, the LED blinks yellow: switch the FM-1 off, then on (straight on the board for this: no hub).
+3. The menu, in the theme's colors, with both batteries at the top. A page on each of three buttons (on the SMK-37:
+   PATCH, BT and GLOBE):
+   - HOME: the firmwares. Turn SEL to move (or press a piano key: its row), OCT+ to install, and OCT+ again to be
+     sure (anything else: back). EDIT shows its details (what it's for, its size, its date), REC deletes it.
+   - SAVE: "Back up now", then the backups, to restore (OCT+), see (EDIT) or delete (REC) as on HOME.
+   - GLO: the theme (OCT+, then turn SEL to see each: OCT+ keeps it, in `theme.txt`), and ABOUT: what its chip is
+     (its flash and its key, like M-Flasher's page says), the loader, the drive's room, the board's version.
+
+   The buttons that do something glow dimly. To keep what's on it, switch the FM-1 off and on.
 4. The board writes it (magenta), or backs it up to `fm1-N.bin` (white): the FM-1's screen shows its flash, 16 x 16
    sectors of 4 KiB, as they're read or written, and the percentage above them. Then the FM-1 starts: the LED green.
    Three red blips and a pause: it didn't (`log.txt` says why). Then the board restarts, as its host again (the FM-1
@@ -112,6 +118,7 @@ git submodule update --init
 JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/lilfm1.bin, build/lilsmk.bin
 PI32V2_TOOLCHAIN=~/pi32v2-llvm third_party/fm1buddy/loader/build.sh  # its build/mflr-loader.bin, and src/app/mflr_loader.h (the board's)
 pio run -e xiaoplus -t upload                        # the board
+tools/preview.sh                                     # the menu's screens as PNGs, drawn here: build/preview/
 npm run fmt                                          # the web page's formatting
 npm start                                            # the web page at localhost:8080 (reloads on changes), with what's built
 ```

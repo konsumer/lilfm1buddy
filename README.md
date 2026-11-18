@@ -119,6 +119,7 @@ JIELI_TOOLCHAIN=~/.jieli/toolchain picker/build.sh   # build/lilfm1.bin, build/l
 PI32V2_TOOLCHAIN=~/pi32v2-llvm third_party/fm1buddy/loader/build.sh  # its build/mflr-loader.bin, and src/app/mflr_loader.h (the board's)
 pio run -e xiaoplus -t upload                        # the board
 tools/preview.sh                                     # the menu's screens as PNGs, drawn here: build/preview/
+tools/emu.sh                                         # the menu in the browser (the page's Try it): site/fw/menu.wasm
 npm run fmt                                          # the web page's formatting
 npm start                                            # the web page at localhost:8080 (reloads on changes), with what's built
 ```

@@ -55,6 +55,8 @@ jobs:
           python-version: '3.12'
       - run: pip install platformio
       - run: pio run -e xiaoplus -e xiao -e zero -e supermini -e devkit
+      # the menu in the browser (tools/emu.sh: Try it) wants a WebAssembly linker beside the runner's clang
+      - run: sudo apt-get install -y lld
       - name: the page, with the program and the menus
         run: tools/site.sh
       - uses: actions/upload-artifact@v4

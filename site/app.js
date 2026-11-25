@@ -182,11 +182,12 @@ const deviceOf = (product) => (DEVICES.find(([, re]) => re.test(product || '')) 
 
 const label = (f) => `${f.name} ${f.version}${f.variant ? ` (${f.variant})` : ''}${f.beta ? ' beta' : ''}, ${f.author}`
 
-fetch(CLOUD + 'firmware.json')
+// (only firmware with an FM-1 or SMK-37 package: mutant.cloud filters out tools and listings without one)
+fetch(CLOUD + 'firmware.json?kind=firmware&file=yes')
   .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
   .then((c) => {
     for (const e of c.entries || []) {
-      if (e.kind !== 'firmware' || e.archived || !e.release) continue
+      if (e.archived || !e.release) continue
       const pkgs = (e.release.assets || []).filter((a) => deviceOf(a.product) && a.size && /^[0-9a-f]{64}$/.test(a.sha256 || '') && !a.missing)
       for (const a of pkgs) {
         const device = deviceOf(a.product)
